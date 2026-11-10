@@ -275,7 +275,7 @@ class Ps1Adapter(EngineAdapter):
 
     # Real SwanStation option values (strings in libswanstation_libretro_android.so).
     COMMON = {
-        "swanstation_GPU_Renderer": "OpenGL",
+        "swanstation_GPU_Renderer": "Software",
         "swanstation_BIOS_PatchFastBoot": "true",           # skip the PlayStation logo
         "swanstation_Console_Region": "Auto",
         "swanstation_CDROM_RegionCheck": "false",
