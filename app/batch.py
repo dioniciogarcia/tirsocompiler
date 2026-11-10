@@ -19,7 +19,7 @@ from .core import consoles, gameinfo, identify
 LOOKUP_THREADS = 3
 FOUND_STATES = ("found", "name", "manual")
 DEFAULTS = {"profile": "balanced", "widescreen": True, "resolution": "auto", "ds_layout": "rotate",
-            "wii_controls": "sideways", "orientation": "landscape", "graphics": "vulkan"}
+            "wii_controls": "sideways", "orientation": "landscape", "graphics": "vulkan", "screen_filter": "auto"}
 
 
 class BatchMixin:
@@ -157,13 +157,12 @@ class BatchMixin:
         keep = {}
         allowed = {"profile": [p["id"] for p in consoles.PROFILES], "resolution": ["auto", "720p", "1080p", "1440p"],
                    "ds_layout": ["rotate", "stacked", "side", "large"], "wii_controls": ["sideways", "nunchuk", "classic", "gamecube"],
-                   "orientation": ["landscape", "portrait", "auto"], "graphics": ["vulkan", "opengl"]}
+                   "orientation": ["landscape", "portrait", "auto"], "graphics": ["vulkan", "opengl"],
+                   "screen_filter": ["auto", "default", "sharp", "smooth", "smooth2", "lcd", "crt"]}
         for k, ok in allowed.items():
             if (settings or {}).get(k) in ok:
                 keep[k] = settings[k]
         keep["widescreen"] = bool((settings or {}).get("widescreen", True))
-        if keep.get("profile") != "quality":
-            keep["resolution"] = "auto"
         self._db.run("UPDATE batch_folders SET settings_json=? WHERE id=?", (json.dumps(keep), folder_id))
         return {"ok": True, "settings": self.batch_get_settings(folder_id)}
 

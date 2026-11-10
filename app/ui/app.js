@@ -257,7 +257,7 @@
         <span class="faint small">${esc(r.size_h)}</span></div>`).join("")}</div>
       <h3>Performance profile</h3>
       <div class="seg" id="bProfile">${S.profiles.map((p) => `<button data-p="${p.id}" class="${B.profile === p.id ? "on" : ""}">${esc(p.name)}</button>`).join("")}</div>
-      ${(c.resolutions || []).length ? `<div id="bResWrap" hidden><h3 style="margin-top:14px">Resolution</h3><div class="seg" id="bRes">${c.resolutions.map((x) => `<button data-r="${x.id}" class="${x.id === "auto" ? "on" : ""}" title="${esc(x.detail)}">${esc(x.label)}</button>`).join("")}</div></div>` : ""}
+      ${(c.resolutions || []).length ? `<div id="bResWrap"><h3 style="margin-top:14px">Resolution</h3><div class="seg" id="bRes">${c.resolutions.map((x) => `<button data-r="${x.id}" class="${x.id === "auto" ? "on" : ""}" title="${esc(x.detail)}">${esc(x.label)}</button>`).join("")}</div></div>` : ""}
       ${c.screen_layouts ? `<h3 style="margin-top:14px">DS screen layout</h3><select class="select input" id="bLayout">${c.screen_layouts.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select>`
         : `<h3 style="margin-top:14px">Screen orientation</h3><div class="seg" id="bOrient">${[["landscape", "Landscape"], ["portrait", "Portrait"], ["auto", "Follow the phone"]].map(([k, t]) => `<button data-o="${k}" class="${k === "landscape" ? "on" : ""}">${t}</button>`).join("")}</div>`}
       ${c.controls ? `<h3 style="margin-top:14px">Wii controller</h3><select class="select input" id="bControls">${c.controls.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select>
@@ -267,13 +267,13 @@
       <div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn" data-a="no">Cancel</button><button class="btn primary" id="bGo">Build ${plural(picked.length, "APK")}</button></div></div>`;
     m.hidden = false;
     const seg = (id, key, after) => $$(`#${id} button`, m).forEach((b) => b.onclick = () => { B[key] = b.dataset[Object.keys(b.dataset)[0]]; $$(`#${id} button`, m).forEach((x) => x.classList.toggle("on", x === b)); if (after) after(); });
-    seg("bProfile", "profile", () => { const w = $("#bResWrap", m); if (w) w.hidden = B.profile !== "quality"; });
+    seg("bProfile", "profile");
     seg("bRes", "resolution"); seg("bOrient", "orientation");
     m.onclick = (e) => { if (e.target.dataset.a === "no" || e.target === m) m.hidden = true; };
     $("#bGo", m).onclick = async () => {
       const names = {}; $$("[data-bname]", m).forEach((i) => names[i.dataset.bname] = i.value.trim());
       if (Object.values(names).some((n) => !n)) return toast("Every game needs an app name.", "warn");
-      const options = { profile: B.profile, orientation: B.orientation, resolution: B.profile === "quality" ? B.resolution : "auto",
+      const options = { profile: B.profile, orientation: B.orientation, resolution: B.resolution || "auto",
         widescreen: $("#bWide", m) ? $("#bWide", m).checked : false, tv: $("#bTv", m) ? $("#bTv", m).checked : false,
         ds_layout: $("#bLayout", m) ? $("#bLayout", m).value : undefined, wii_controls: $("#bControls", m) ? $("#bControls", m).value : undefined };
       $("#bGo", m).disabled = true;
@@ -339,7 +339,7 @@
     if (opts.fresh || !S.builder) S.builder = freshBuilder();
     if (opts.edit) {
       const g = opts.edit;
-      S.builder = Object.assign(freshBuilder(), { id: g.id, console: g.console, rom_id: g.rom_id, app_name: g.app_name, package_id: g.package_id, pkgTouched: true, orientation: g.orientation, profile: g.profile, icon_path: g.icon_path, icon_url: g.icon, bios_id: g.bios_id, widescreen: !!(g.settings || {}).widescreen, resolution: (g.settings || {}).resolution || "auto", ds_layout: (g.settings || {}).ds_layout || "stacked", wii_controls: (g.settings || {}).wii_controls || "sideways", graphics: (g.settings || {}).graphics || "vulkan", tv: !!(g.settings || {}).tv, info_dir: g.info_dir || null, step: 3 });
+      S.builder = Object.assign(freshBuilder(), { id: g.id, console: g.console, rom_id: g.rom_id, app_name: g.app_name, package_id: g.package_id, pkgTouched: true, orientation: g.orientation, profile: g.profile, icon_path: g.icon_path, icon_url: g.icon, bios_id: g.bios_id, widescreen: !!(g.settings || {}).widescreen, resolution: (g.settings || {}).resolution || "auto", ds_layout: (g.settings || {}).ds_layout || "stacked", wii_controls: (g.settings || {}).wii_controls || "sideways", graphics: (g.settings || {}).graphics || "vulkan", screen_filter: (g.settings || {}).screen_filter || null, tv: !!(g.settings || {}).tv, info_dir: g.info_dir || null, step: 3 });
     }
     const B = S.builder;
     const done = [!!B.console, !!B.rom_id, !!(B.report && B.report.can_save), !!(B.app_name && B.package_id) && B.step > 3, false];
@@ -565,10 +565,13 @@
     body.innerHTML = `
       <div class="panel"><h2>Performance profile</h2>
         <div class="profiles">${S.profiles.map((p) => `<button class="profile ${B.profile === p.id ? "on" : ""}" data-p="${p.id}"><h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p></button>`).join("")}</div>
-        ${(c.resolutions || []).length ? `<div id="resWrap" ${B.profile === "quality" ? "" : "hidden"}>
+        ${(c.resolutions || []).length ? `<div id="resWrap">
         <h2 style="margin-top:24px">Resolution</h2>
         <div class="seg" id="res">${c.resolutions.map((r) => `<button data-r="${r.id}" class="${(B.resolution || "auto") === r.id ? "on" : ""}" title="${esc(r.detail)}">${esc(r.label)}</button>`).join("")}</div>
         <p class="muted small" id="resNote" style="margin-top:8px"></p></div>` : ""}
+        ${(c.screen_filters || []).length ? `<h2 style="margin-top:24px">Screen filter</h2>
+        <div class="seg" id="sf" style="flex-wrap:wrap">${c.screen_filters.map((x) => `<button data-f="${x.id}" class="${(B.screen_filter || c.screen_filter_default) === x.id ? "on" : ""}">${esc(x.name)}</button>`).join("")}</div>
+        <p class="muted small" id="sfNote" style="margin-top:8px"></p>` : ""}
         ${(c.graphics || []).length ? `<h2 style="margin-top:24px">Graphics</h2>
         <div class="seg" id="gfx">${c.graphics.map((x) => `<button data-g="${x.id}" class="${(B.graphics || "vulkan") === x.id ? "on" : ""}">${esc(x.name)}</button>`).join("")}</div>
         <p class="muted small" id="gfxNote" style="margin-top:8px">${esc((c.graphics.find((x) => x.id === (B.graphics || "vulkan")) || c.graphics[0]).desc)} You can still switch in the game's pause menu (Graphics).</p>` : ""}
@@ -594,9 +597,13 @@
         </div></div>`;
     $$(".profile", body).forEach((b) => b.onclick = () => {
       B.profile = b.dataset.p; $$(".profile", body).forEach((x) => x.classList.toggle("on", x === b));
-      const rw = $("#resWrap", body); if (rw) rw.hidden = B.profile !== "quality";   // resolution choice belongs to High Quality
+
     });
     const wide = $("#wide", body); if (wide) wide.onchange = () => { B.widescreen = wide.checked; };
+    const sfNote = () => { const n = $("#sfNote", body); if (!n) return; const f = c.screen_filters.find((x) => x.id === (B.screen_filter || c.screen_filter_default)) || c.screen_filters[0];
+      n.textContent = f.desc + (B.console === "gba" || B.console === "nds" ? " This console's games are drawn at their original size; the filter decides how they're enlarged to your screen." : "") + " Can also be changed in the game's pause menu."; };
+    $$("#sf button", body).forEach((b) => b.onclick = () => { B.screen_filter = b.dataset.f; $$("#sf button", body).forEach((x) => x.classList.toggle("on", x === b)); sfNote(); });
+    sfNote();
     $$("#gfx button", body).forEach((b) => b.onclick = () => {
       B.graphics = b.dataset.g; $$("#gfx button", body).forEach((x) => x.classList.toggle("on", x === b));
       $("#gfxNote", body).textContent = c.graphics.find((x) => x.id === B.graphics).desc + " You can still switch in the game's pause menu (Graphics).";
@@ -613,7 +620,7 @@
     resNote();
     const tvs = $("#tvSwitch", body); if (tvs) tvs.onchange = () => { B.tv = tvs.checked; resNote(); };
     const saveIt = async () => {
-      const r = await api("save_game", { id: B.id, rom_id: B.rom_id, console: B.console, app_name: B.app_name.trim(), package_id: B.package_id, orientation: B.orientation, profile: B.profile, icon_path: B.icon_path, bios_id: B.bios_id, widescreen: B.widescreen, resolution: B.profile === "quality" ? B.resolution : "auto", ds_layout: B.ds_layout, wii_controls: B.wii_controls, graphics: B.graphics, tv: B.tv, info_dir: B.info_dir });
+      const r = await api("save_game", { id: B.id, rom_id: B.rom_id, console: B.console, app_name: B.app_name.trim(), package_id: B.package_id, orientation: B.orientation, profile: B.profile, icon_path: B.icon_path, bios_id: B.bios_id, widescreen: B.widescreen, resolution: B.resolution || "auto", screen_filter: B.screen_filter, ds_layout: B.ds_layout, wii_controls: B.wii_controls, graphics: B.graphics, tv: B.tv, info_dir: B.info_dir });
       if (!r.ok) { toast(r.error, "fail"); return null; }
       B.id = r.id;
       return r.id;
@@ -1168,7 +1175,7 @@
 
   function batchSettingsText(st) {
     const prof = (S.profiles.find((p) => p.id === st.profile) || {}).name || st.profile;
-    return [prof + (st.profile === "quality" && st.resolution !== "auto" ? " " + st.resolution : ""),
+    return [prof + (st.resolution && st.resolution !== "auto" ? " " + st.resolution : ""),
       st.widescreen ? "widescreen on" : "widescreen off",
       "DS: " + ({ rotate: "turns with the phone", stacked: "stacked screens", side: "side by side", large: "large top screen" })[st.ds_layout],
       "Wii: " + ({ sideways: "Wii Remote sideways", nunchuk: "Wii Remote + Nunchuk", classic: "Classic Controller", gamecube: "GameCube controller" })[st.wii_controls],
@@ -1185,9 +1192,10 @@
       <p class="small">Used for every game built from this folder. Games you set up yourself in My Games keep their own settings.</p>
       <h3>Performance profile</h3>
       <div class="profiles">${S.profiles.map((p) => `<button class="profile ${st.profile === p.id ? "on" : ""}" data-p="${p.id}"><h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p></button>`).join("")}</div>
-      <div id="bsRes" ${st.profile === "quality" ? "" : "hidden"}><h3 style="margin-top:14px">Resolution (N64, PSP, PS2, GameCube, Wii)</h3>
+      <div id="bsRes"><h3 style="margin-top:14px">Resolution (N64, PSP, PS2, GameCube, Wii)</h3>
         ${seg("bsResSeg", "resolution", [["auto", "Auto"], ["720p", "720p"], ["1080p", "1080p"], ["1440p", "1440p"]])}</div>
       <label class="toggle-row" style="margin-top:14px" for="bsWide"><span class="grow"><h3>Widescreen hack</h3><p class="small">For consoles that have one (N64, PSP, PS2, GameCube, Wii).</p></span><input type="checkbox" id="bsWide" class="switch" ${st.widescreen ? "checked" : ""}></label>
+      <h3 style="margin-top:14px">Screen filter (GBA, DS, N64, PSP)</h3>${seg("bsSf", "screen_filter", [["auto", "Each console's usual"], ["default", "Original"], ["sharp", "Sharp pixels"], ["smooth", "Smooth upscale"], ["lcd", "Handheld LCD"], ["crt", "CRT TV"]])}
       <h3 style="margin-top:14px">GameCube and Wii graphics</h3>${seg("bsGfx", "graphics", [["vulkan", "Vulkan"], ["opengl", "OpenGL ES"]])}
       <h3 style="margin-top:14px">DS screens</h3>${seg("bsDs", "ds_layout", [["rotate", "Turn with the phone"], ["stacked", "Stacked"], ["side", "Side by side"], ["large", "Large top screen"]])}
       <h3 style="margin-top:14px">Wii controller</h3>${seg("bsWii", "wii_controls", [["sideways", "Remote sideways"], ["nunchuk", "Remote + Nunchuk"], ["classic", "Classic"], ["gamecube", "GameCube"]])}
@@ -1195,8 +1203,8 @@
       <div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn" data-a="no">Cancel</button><button class="btn primary" id="bsSave">Save</button></div></div>`;
     m.hidden = false;
     const segBind = (id, key) => $$(`#${id} button`, m).forEach((b) => b.onclick = () => { st[key] = b.dataset.v; $$(`#${id} button`, m).forEach((x) => x.classList.toggle("on", x === b)); });
-    segBind("bsResSeg", "resolution"); segBind("bsGfx", "graphics"); segBind("bsDs", "ds_layout"); segBind("bsWii", "wii_controls"); segBind("bsOr", "orientation");
-    $$(".profile", m).forEach((b) => b.onclick = () => { st.profile = b.dataset.p; $$(".profile", m).forEach((x) => x.classList.toggle("on", x === b)); $("#bsRes", m).hidden = st.profile !== "quality"; });
+    segBind("bsResSeg", "resolution"); segBind("bsSf", "screen_filter"); segBind("bsGfx", "graphics"); segBind("bsDs", "ds_layout"); segBind("bsWii", "wii_controls"); segBind("bsOr", "orientation");
+    $$(".profile", m).forEach((b) => b.onclick = () => { st.profile = b.dataset.p; $$(".profile", m).forEach((x) => x.classList.toggle("on", x === b)); });
     m.onclick = async (e) => {
       if (e.target.id === "bsSave") {
         st.widescreen = $("#bsWide", m).checked;

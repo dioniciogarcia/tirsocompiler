@@ -3,18 +3,18 @@
   "frontend": "LibretroDroid 0.14.0, RadialGamePad 08d1dd95",
   "min_android": "8.0",
   "tested": true,
-  "version": "1.8.0",
+  "version": "1.9.0",
   "name": "Tirso DS player",
   "engine": "melonDS DS",
   "core": "libmelondsds_libretro_android.so",
   "core_build": "libretro buildbot nightly 2026-11-04 (melonds-ds f394adbacb57)",
-  "sha256": "528a6457efcb32ba3447b27cb8b2755a8ffec3b1cc16ffc3aeaeba6f9e845bba",
+  "sha256": "4757410dca92ff569bcfaf7eecce6727c2b6ff30329cad76b40b15b6abf3bcf8",
   "source": "templates/source.zip (flavor nds)",
   "apk_tv": "template-tv.apk",
-  "sha256_tv": "f272e7a55b96710044f6a1b9d9aae8f2bd4423bd29165139003fc520b2c0a2c7",
+  "sha256_tv": "1e26b5482e25300929b841604dc966ed5115a4606afa50eea0419438e83c8ad8",
   "abi": "phone: arm64-v8a; tv: arm64-v8a + armeabi-v7a",
   "tested_on": "Galaxy S25, S24, S20 FE (4 Nov 2026)",
   "tv_tested": false,
   "core_tv_32bit": "libdesmume_libretro_android.so (DeSmuME ARM-JIT, buildbot 2026-11-04, 95b4d798731c)",
-  "changes": "New: Game information in the in-game menu (box art, details, description, screenshots) for games built with Batch Build. Menu items keep their order when some are hidden."
+  "changes": "Two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; Screen filter in the pause menu; saves backed up automatically to Downloads/Tirso Saves (TirsoDrive can restore them); TV game mode for less input delay; DS microphone; GameCube/Wii start with the graphics chosen in Tirso."
 }

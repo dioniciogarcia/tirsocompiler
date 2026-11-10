@@ -6,7 +6,7 @@ a performance profile into that engine's real settings.
 import json
 from pathlib import Path
 
-from . import toolchain
+from . import consoles, toolchain
 
 
 class EngineAdapter:
@@ -64,6 +64,7 @@ class EngineAdapter:
             orientation = "landscape"  # TV builds always open sideways
         return {
             "title": game["app_name"],
+            "console_name": (consoles.get(self.console) or {}).get("name", ""),
             "rom": payload_name or self.rom_asset_name(rom["path"]),
             "rom_size": payload_size if payload_size is not None else rom["size"],
             "rom_sha1": rom["sha1"] or "",
@@ -73,7 +74,8 @@ class EngineAdapter:
             "screen_mode": mode,
             "aspect": round(aspect, 4),
             "system_zip": self.system_zip or "",
-            "shader": "default",
+            "shader": json.loads(game.get("settings_json") or "{}").get("screen_filter")
+                      or (consoles.get(self.console) or {}).get("screen_filter_default", "default"),
             "auto_resume": True,
             "rumble": True,
             "variables": self.variables(game["profile"], settings),
@@ -112,8 +114,10 @@ class N64Adapter(EngineAdapter):
     # TV devices have weak graphics chips. By default GLideN64 copies the colour and
     # depth buffers back to the CPU every frame ("Software" depth copy is very slow there).
     # Off breaks only a few effects (e.g. Pokemon Snap photos, some sun glare).
+    # No threaded renderer on TV: it speeds up drawing but makes the game react a frame later, which on top
+    # of the TV's own delay made controls feel slow. (The TV is also asked for its game mode.)
     TV_LIGHT = {"mupen64plus-EnableCopyDepthToRDRAM": "Off", "mupen64plus-EnableCopyColorToRDRAM": "Off",
-                "mupen64plus-ThreadedRenderer": "True", "mupen64plus-FrameDuping": "True",
+                "mupen64plus-ThreadedRenderer": "False", "mupen64plus-FrameDuping": "True",
                 "mupen64plus-MultiSampling": "0", "mupen64plus-EnableShadersStorage": "True"}
     TV_SIZE = {"battery": "320x240", "balanced": "640x480", "performance": "320x240", "quality": "640x480"}
     TV_WIDE = {"battery": "640x360", "balanced": "640x360", "performance": "640x360", "quality": "960x540"}
@@ -165,6 +169,8 @@ class NdsAdapter(EngineAdapter):
         "melonds_sysfile_mode": "builtin",
         "melonds_boot_mode": "direct",
         "melonds_touch_mode": "auto",       # finger, or right stick + R2 with a controller
+        "melonds_mic_input": "microphone",  # the phone's microphone (the app switches to silence if not allowed)
+        "melonds_mic_input_active": "always",
         "melonds_show_cursor": "timeout",   # the pencil shows while the right stick moves it
         "melonds_render_mode": "software",
         "melonds_threaded_renderer": "enabled",
@@ -310,6 +316,7 @@ class Ps2Adapter(EngineAdapter):
         settings = json.loads(game.get("settings_json") or "{}")
         return {
             "title": game["app_name"],
+            "console_name": (consoles.get(self.console) or {}).get("name", ""),
             "orientation": game.get("orientation") or "landscape",  # landscape / portrait / auto
             "widescreen": bool(settings.get("widescreen")),  # ARMSX2 widescreen patches + 16:9
             "upscale": self.UPSCALE.get(settings.get("resolution"), 1),  # ARMSX2 resolution multiplier

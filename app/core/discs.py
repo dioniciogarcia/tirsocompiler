@@ -151,6 +151,20 @@ def parse_cue(path):
             frames = (int(m.group(2)) * 60 + int(m.group(3))) * 75 + int(m.group(4))
             if int(m.group(1)) == 1 or t["index"] is None:
                 t["index"] = frames
+    if missing and not files:
+        # The .bin was renamed but the .cue wasn't: use the .bin with the same name as the .cue, or the only
+        # .bin in the folder.
+        stem = os.path.splitext(os.path.basename(path))[0].lower()
+        try:
+            bins = [os.path.join(folder, n) for n in os.listdir(folder) if n.lower().endswith(".bin")]
+        except OSError:
+            bins = []
+        same = [b for b in bins if os.path.splitext(os.path.basename(b))[0].lower() == stem]
+        guess = same[0] if same else (bins[0] if len(bins) == 1 else None)
+        if guess and len(missing) == 1:
+            files, missing = [guess], []
+            for t in tracks:
+                t["file"] = guess
     if not tracks and not files:
         raise CueError("This CUE file doesn't list any tracks.")
     data = None

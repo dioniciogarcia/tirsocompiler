@@ -182,7 +182,8 @@ class Api(BatchMixin):
                 updated += 1
                 continue
             info = identify.identify(path)
-            if path in from_folder and not info["console"] and info["format"] != "chd":
+            if path in from_folder and not info["console"] and info["format"] not in ("chd", "cue") \
+                    and not (info["format"] == "bin" and self._looks_like_disc(path)):
                 skipped.append({"path": path, "reason": "Not recognised as a game (add it on its own to set the console by hand)"})
                 continue
             name = info["title"] or os.path.splitext(os.path.basename(path))[0]
@@ -200,6 +201,16 @@ class Api(BatchMixin):
             added += 1
         self._emit("library_changed", {})
         return {"added": added, "updated": updated, "skipped": skipped}
+
+    @staticmethod
+    def _looks_like_disc(path):
+        """A .bin that is a disc image (raw CD sectors, or big enough to be a DVD) and not a BIOS dump."""
+        from .core.discs import CD_SYNC
+        try:
+            with open(path, "rb") as f:
+                return f.read(12) == CD_SYNC or os.path.getsize(path) > 64 * 1024 * 1024
+        except OSError:
+            return False
 
     def _work(self):
         while True:
@@ -580,8 +591,10 @@ class Api(BatchMixin):
         res_ids = [x["id"] for x in features.get("resolutions", [])]
         if res_ids:
             game_settings["resolution"] = data.get("resolution") if data.get("resolution") in res_ids else "auto"
-            if data.get("profile") != "quality":
-                game_settings["resolution"] = "auto"   # resolution is a High Quality choice
+        filter_ids = [x["id"] for x in features.get("screen_filters", [])]
+        if filter_ids:
+            game_settings["screen_filter"] = data.get("screen_filter") if data.get("screen_filter") in filter_ids \
+                else features.get("screen_filter_default", "default")
         layouts = [x["id"] for x in features.get("screen_layouts", [])]
         if layouts:
             game_settings["ds_layout"] = data.get("ds_layout") if data.get("ds_layout") in layouts else layouts[0]

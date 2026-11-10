@@ -117,6 +117,38 @@ NEW: GAME BOY ADVANCE, BATCH BUILDS, FOLDERS PER CONSOLE
   - In every game's pause menu: "Save problem report" saves a technical report
     to the phone's Downloads folder, to send to Claude when something goes wrong.
 
+VERSION 1.1
+  - Game information for single games too: Game Builder step 4 looks the game up and
+    uses its real name and logo icon (you can still pick your own). "Wrong game?"
+    lets you choose the right one.
+  - Batch Build: "Settings for every game in this folder" (profile, resolution,
+    widescreen, screen filter, GameCube/Wii graphics, DS screens, Wii controller).
+  - TV builds are saved as "<Game> (For TV).apk" (the name on the TV stays the game's).
+  - ROM Library: "Remove missing" removes games whose files are gone (their
+    projects too, after asking). Adding a file again reads it again.
+  - Light and dark look: Settings > Appearance (Light, Dark, or follow Windows).
+  - Resolution can be chosen with every profile, not only High Quality.
+  - Screen filter (GBA, DS, N64, PSP): Original, Sharp pixels, Smooth upscale, Handheld
+    LCD, CRT TV. In the builder, and in every game's pause menu.
+  - GameCube/Wii: choose Vulkan or OpenGL ES in the builder (still switchable in game).
+  - In the games: two touch buttons at once now work on every phone (Galaxy S20 FE);
+    "Hide touch controls" keeps them hidden until you press Back; TVs are asked for
+    their game mode (less input delay), and N64 on TV no longer adds a frame of delay;
+    DS games can use the phone's microphone (asked once; "Microphone" in the menu).
+  - PS2 BIN/CUE: a .bin that was renamed without its .cue is found anyway, and
+    BIN/CUE discs in a folder are added even when Tirso can't tell the console.
+
+SAVE BACKUPS (FOR TIRSODRIVE)
+  - Every game app copies its saves to Download/Tirso Saves on the phone whenever
+    they change: "<Game> (<Console>) - saves.zip". In-game saves, memory cards and
+    manual save states are included (not the automatic "where you left off" state).
+  - The zip holds tirso-saves.json: {"format": 1, "package", "title", "console",
+    "created"}, plus saves/ and states/ folders.
+  - To restore, another app (TirsoDrive) opens the game with
+    Intent("com.tirso.action.RESTORE_SAVES") and the zip as data (type
+    application/zip, with read permission). The game asks before replacing saves.
+  - "Back up saves" / "Restore saves" in the pause menu still work by hand.
+
 BATCH BUILD TAB (A WHOLE FOLDER, WITH GAME INFORMATION AND LOGO ICONS)
   - Batch Build (sidebar): choose Phones or TV, then "Choose a folder". Sub-folders
     are included; files that aren't games are skipped.

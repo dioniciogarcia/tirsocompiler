@@ -189,6 +189,23 @@ RESOLUTIONS = {
 for _c in CONSOLES:
     _c["resolutions"] = [{"id": i, "label": l, "detail": d} for i, l, d in RESOLUTIONS.get(_c["id"], [])]
 
+# How the picture is scaled to the phone's screen (the player's video library does it; the game's own
+# resolution doesn't change). For GBA and DS this is the "sharper picture" option. Not for GameCube/Wii/PS2,
+# whose engines draw at a higher resolution themselves.
+SCREEN_FILTERS = [
+    ("default", "Original", "Plain scaling, a little soft."),
+    ("sharp", "Sharp pixels", "Crisp, evenly sized pixels."),
+    ("smooth", "Smooth upscale", "Smooths jagged edges so pixel art looks closer to a high-resolution picture."),
+    ("smooth2", "Smooth upscale, strong", "Stronger smoothing; uses more battery."),
+    ("lcd", "Handheld LCD", "Shows the pixel grid like the original handheld screen."),
+    ("crt", "CRT TV", "Scanlines like an old TV."),
+]
+FILTER_DEFAULT = {"gba": "sharp", "nds": "sharp", "n64": "default", "psp": "default"}
+for _c in CONSOLES:
+    if _c["id"] in FILTER_DEFAULT:
+        _c["screen_filters"] = [{"id": i, "name": n, "desc": d} for i, n, d in SCREEN_FILTERS]
+        _c["screen_filter_default"] = FILTER_DEFAULT[_c["id"]]
+
 
 ALL_EXTENSIONS = sorted({e for c in CONSOLES for e in c["extensions"]})
 

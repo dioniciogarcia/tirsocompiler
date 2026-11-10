@@ -132,7 +132,7 @@ psp_r = api.save_game(dict(id=pspg["id"], rom_id=by["Test PSP.iso"]["id"], conso
 check([x for x in api.list_games() if x["id"] == pspg["id"]][0]["settings"].get("resolution") == "1080p", "resolution saved with the game")
 api.save_game(dict(id=pspg["id"], rom_id=by["Test PSP.iso"]["id"], console="psp", app_name="PSP", package_id="com.tirso.psp",
                    orientation="landscape", profile="balanced", resolution="1080p"))
-check([x for x in api.list_games() if x["id"] == pspg["id"]][0]["settings"].get("resolution") == "auto", "resolution only applies with High Quality")
+check([x for x in api.list_games() if x["id"] == pspg["id"]][0]["settings"].get("resolution") == "1080p", "resolution can be chosen with any profile")
 nds_rom = by["Test DS Game.nds"]
 dsg = api.save_game(dict(rom_id=nds_rom["id"], console="nds", app_name="DS Res", package_id="com.tirso.dsres",
                          orientation="landscape", profile="balanced", resolution="1080p"))
