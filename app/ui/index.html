@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tirso Compiler</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="3" y="5" width="20" height="24" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="7" y="9" width="12" height="8" rx="1.5" fill="currentColor" opacity=".35"/>
+        <path d="M23 12h3a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-3" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="13" cy="23" r="2" fill="currentColor"/>
+      </svg>
+      <div>
+        <div class="brand-name">Tirso Compiler</div>
+        <div class="brand-sub">Games into Android apps</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-page="dashboard">Dashboard</button>
+      <button data-page="builder">Game Builder</button>
+      <button data-page="games">My Games</button>
+      <button data-page="batch">Batch Build</button>
+      <button data-page="library">ROM Library</button>
+      <button data-page="engines">Engine Manager</button>
+      <button data-page="bios">BIOS Manager</button>
+      <button data-page="builds">Build Center</button>
+      <button data-page="settings">Settings</button>
+    </nav>
+    <div class="side-foot">
+      <div class="side-foot-text">Version 1.1 · N64, DS, GBA, PSP, PS2, GameCube, Wii</div>
+    </div>
+  </aside>
+  <main class="main" id="main" tabindex="-1"></main>
+</div>
+<div class="drop-veil" id="dropVeil"><div>Drop to add to your library</div></div>
+<div class="toast-stack" id="toasts" aria-live="polite"></div>
+<div class="modal-veil" id="modal" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

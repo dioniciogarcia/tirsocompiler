@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tirso Compiler: the game app's name. Deliberately NOT translated, so the
+     name Tirso writes here is what every phone shows, whatever its language. -->
+<resources>
+    <string name="tirso_game_name" translatable="false">Tirso PS2 Game</string>
+    <color name="tirso_launcher_bg">#FF0F121A</color>
+</resources>

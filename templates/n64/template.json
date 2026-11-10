@@ -1,0 +1,19 @@
+{
+  "name": "Tirso N64 player",
+  "version": "1.8.0",
+  "apk": "template.apk",
+  "sha256": "c95a1d516ab82efef4bd3f81f0f76f16a782aecd6fd7cdf1727202aef0062f84",
+  "engine": "Mupen64Plus-Next",
+  "core": "libmupen64plus_next_gles3_libretro_android.so",
+  "core_build": "libretro buildbot nightly 2026-11-04 (develop 15bada8)",
+  "frontend": "LibretroDroid 0.14.0, RadialGamePad 08d1dd95",
+  "min_android": "8.0",
+  "tested": true,
+  "tested_on": "Galaxy S25, S24, S20 FE (4 Nov 2026)",
+  "source": "templates/source.zip (flavor n64)",
+  "apk_tv": "template-tv.apk",
+  "sha256_tv": "9a90e109be817f3d3c5a2c21736561aee99175e2ab76c9878d601abd88a53a5c",
+  "abi": "phone: arm64-v8a; tv: arm64-v8a + armeabi-v7a",
+  "tv_tested": false,
+  "changes": "New: Game information in the in-game menu (box art, details, description, screenshots) for games built with Batch Build. Menu items keep their order when some are hidden."
+}

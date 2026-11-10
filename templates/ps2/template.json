@@ -1,0 +1,19 @@
+{
+  "apk": "template.apk",
+  "name": "Tirso PS2 player",
+  "version": "1.5.0",
+  "engine": "ARMSX2",
+  "core": "libemucore_4k.so",
+  "core_build": "ARMSX2 (GPLv3) built from source, commit 1049db37fba4, play flavor, NDK 29, profile-guided optimization (ARMSX2's own pgo/armsx2.profdata, as in its official builds)",
+  "label_string": "tirso_game_name",
+  "icon_name": "tirso_launcher",
+  "icon_bg_color": "tirso_launcher_bg",
+  "min_android": "8.0",
+  "abi": "phone: arm64-v8a",
+  "sha256": "de79bd72b4404898fd7196583a1c2f42d0c4517053a53092737e735c3b3e7b80",
+  "source": "templates/ps2/source (Tirso boot screen + apply.py; ARMSX2 source: github.com/ARMSX2/ARMSX2 at 1049db37fba4)",
+  "tested": true,
+  "features": "widescreen (ARMSX2 widescreen patches + 16:9)",
+  "frontend": "Tirso player look: RadialGamePad 08d1dd95 touch controls + Tirso pause menu (ARMSX2 screens hidden)",
+  "changes": "Uses the GPU driver pack (e.g. Mesa Turnip) added in Tirso Compiler: installed on first start and switched on with Vulkan, on Adreno GPUs only. Keeps: BIOS first-start fix, profile-guided optimization, orientation, resolution, Tirso touch controls and menu."
+}

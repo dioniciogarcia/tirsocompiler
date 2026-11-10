@@ -1,0 +1,30 @@
+.venv/
+__pycache__/
+*.pyc
+# Never commit game files, BIOS files or signing keys
+*.z64
+*.n64
+*.v64
+*.nds
+*.iso
+*.cso
+*.chd
+*.rvz
+*.wbfs
+*.bin
+*.keystore
+*.jks
+
+# Installer output
+build/
+Installer/
+*.gba
+*.gcm
+*.gcz
+*.cue
+*.7z
+
+# Your own files on the PC: game folders, BIOS dumps, notes from Claude, built installers
+/ROMS/
+/Claude outputs/
+installer/*.exe

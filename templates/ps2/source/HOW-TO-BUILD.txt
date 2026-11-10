@@ -1,0 +1,23 @@
+Tirso PS2 player = ARMSX2 (GPL-3.0, https://github.com/ARMSX2/ARMSX2) + a small Tirso boot screen.
+
+Source of the exact build in templates/ps2/template.apk:
+  1. git clone https://github.com/ARMSX2/ARMSX2 && git checkout <commit in ARMSX2-COMMIT.txt>
+     git submodule update --init --recursive
+  2. Copy the "platforms" folder from here over the clone (Tirso boot screen, icons, game-name string),
+     then from the top of the clone run:  git apply armsx2-changes.patch
+     (or run apply.py from platforms/android, which makes the same manifest changes).
+     armsx2-changes.patch also adds a Google Maven mirror to settings.gradle.kts; that part is optional.
+  3. From platforms/android, build (Android SDK 37, NDK 29.0.14206865, CMake 3.31.6, Rust with the aarch64-linux-android target):
+     ./gradlew --max-workers=1 -Parmsx2.applicationId=com.tirso.template \
+               -Parmsx2.appLabel=@string/tirso_game_name \
+               -Parmsx2.pgo=optimize -Parmsx2.pgoProfile=<full path to platforms/android/pgo/armsx2.profdata> assemblePlayRelease
+
+What the Tirso changes do:
+  - TirsoBootActivity (the app's only home-screen icon) copies the BIOS and game that Tirso put inside
+    the APK (or finds the separate game data file in Android/obb/<package>/), sets ARMSX2 options for a
+    one-game app, and starts ARMSX2 with that game.
+  - TirsoPlayer replaces ARMSX2's screens with Tirso's player look: RadialGamePad touch controls
+    (com.github.swordfish90:radialgamepad:08d1dd95 from JitPack, Apache 2.0) and Tirso's pause menu
+    instead of ARMSX2's touch controls, pause menu and game library. It is hooked in at five points
+    (see armsx2-changes.patch): WindowImpl.kt, MainActivityRuntime.kt and Pasx2Application.kt.
+  - ARMSX2's own splash screen is no longer a launcher entry. Nothing in the emulator itself is changed.

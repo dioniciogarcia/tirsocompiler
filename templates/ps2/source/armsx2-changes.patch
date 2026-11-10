@@ -1,0 +1,176 @@
+diff --git a/platforms/android/app/build.gradle.kts b/platforms/android/app/build.gradle.kts
+index 974c5f4..643f3fa 100644
+--- a/platforms/android/app/build.gradle.kts
++++ b/platforms/android/app/build.gradle.kts
+@@ -426,6 +426,7 @@ val checkNoWindowModals by tasks.registering {
+ tasks.named("preBuild") { dependsOn(checkNoWindowModals) }
+ 
+ dependencies {
++    implementation("com.github.swordfish90:radialgamepad:08d1dd95")  // Tirso touch controls
+     // Discord Social SDK. Its .aar's manifest declares RECORD_AUDIO plus foreground-service and
+     // audio-settings permissions for its voice features, and the manifest merger folds them into
+     // ARMSX2. RECORD_AUDIO is ours as well now (the emulated PS2 microphone reads the device's
+diff --git a/platforms/android/app/src/main/AndroidManifest.xml b/platforms/android/app/src/main/AndroidManifest.xml
+index 3f410d6..1520628 100644
+--- a/platforms/android/app/src/main/AndroidManifest.xml
++++ b/platforms/android/app/src/main/AndroidManifest.xml
+@@ -66,10 +66,10 @@
+         android:dataExtractionRules="@xml/data_extraction_rules"
+         android:fullBackupContent="@xml/backup_rules"
+         android:largeHeap="true"
+-        android:icon="@mipmap/ic_launcher"
++        android:icon="@mipmap/tirso_launcher"
+         android:label="${appLabel}"
+         android:networkSecurityConfig="@xml/network_security_config"
+-        android:roundIcon="@mipmap/ic_launcher_round"
++        android:roundIcon="@mipmap/tirso_launcher"
+         android:supportsRtl="true"
+         android:isGame="true"
+         android:appCategory="game"
+@@ -89,18 +89,27 @@
+ 
+         <meta-data android:name="android.max_aspect" android:value="2.4" />
+ 
++        <!-- Tirso Compiler: installs the embedded BIOS and game, then boots straight into it. -->
+         <activity
+-            android:name=".BootSplashActivity"
+-            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"
+-            android:hardwareAccelerated="true"
++            android:name="com.armsx2.tirso.TirsoBootActivity"
++            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+             android:exported="true"
+-            android:resizeableActivity="true"
+-            android:theme="@style/Theme.ARMSX2.Boot">
++            android:noHistory="true"
++            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN" />
+                 <category android:name="android.intent.category.LAUNCHER" />
+                 <category android:name="android.intent.category.GAME" />
+             </intent-filter>
++        </activity>
++
++        <activity
++            android:name=".BootSplashActivity"
++            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"
++            android:hardwareAccelerated="true"
++            android:exported="true"
++            android:resizeableActivity="true"
++            android:theme="@style/Theme.ARMSX2.Boot">
+             <intent-filter>
+                 <action android:name="android.intent.action.VIEW" />
+                 <category android:name="android.intent.category.DEFAULT" />
+diff --git a/platforms/android/app/src/main/java/com/armsx2/Pasx2Application.kt b/platforms/android/app/src/main/java/com/armsx2/Pasx2Application.kt
+index 24541bd..a072573 100644
+--- a/platforms/android/app/src/main/java/com/armsx2/Pasx2Application.kt
++++ b/platforms/android/app/src/main/java/com/armsx2/Pasx2Application.kt
+@@ -31,6 +31,7 @@ class Pasx2Application : Application(), ImageLoaderFactory {
+ 
+ 	override fun onCreate() {
+ 		super.onCreate()
++		com.armsx2.tirso.TirsoPlayer.active(this)  // Tirso game app? (decided before any screen)
+ 		com.armsx2.bugreport.BugReport.init(this)
+ 		installCrashLogging()
+ 	}
+diff --git a/platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt b/platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt
+index 45461d3..e27d664 100644
+--- a/platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt
++++ b/platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt
+@@ -3325,7 +3325,8 @@ open class MainActivityRuntime : ComponentActivity() {
+                                 // The tests still run automatically on first composition
+                                 // (above); their results are now available via the bug
+                                 // toolbar button instead of taking up the main screen.
+-                                com.armsx2.navigation.AppNavigation()
++                                if (com.armsx2.tirso.TirsoPlayer.active) com.armsx2.tirso.TirsoPlayer.StartingScreen()
++                                else com.armsx2.navigation.AppNavigation()
+                             }
+                         }
+                     }
+@@ -3439,6 +3440,7 @@ open class MainActivityRuntime : ComponentActivity() {
+     }
+ 
+     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
++        if (com.armsx2.tirso.TirsoPlayer.onKey(this, event)) return true
+         // Before anything can consume it: whether the pad is driving the menus decides whether
+         // selection highlights show at all.
+         com.armsx2.ui.common.PadInput.onKey(event)
+@@ -4464,6 +4466,7 @@ open class MainActivityRuntime : ComponentActivity() {
+     // on every other device — see maybeCorrectTouchScale). ALWAYS returns super, so it can never
+     // block or consume a tap.
+     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
++        com.armsx2.tirso.TirsoPlayer.onTouch(this, ev)
+         // A touch hands the menus back from the pad, so selection highlights hide (PadInput).
+         com.armsx2.ui.common.PadInput.onTouch(ev)
+         if (com.armsx2.ui.home.LibraryScreensaver.onTouch(ev)) return true
+@@ -4703,6 +4706,7 @@ open class MainActivityRuntime : ComponentActivity() {
+     }
+ 
+     override fun dispatchGenericMotionEvent(ev: MotionEvent): Boolean {
++        com.armsx2.tirso.TirsoPlayer.onMotion(this, ev)
+         com.armsx2.ui.common.PadInput.onMotion(ev)
+         if (com.armsx2.ui.home.LibraryScreensaver.onMotion(ev)) return true
+         // Controller-input diagnostic (ARMSX2_JOYCON): logged before ANY gate so it
+@@ -6170,6 +6174,12 @@ open class MainActivityRuntime : ComponentActivity() {
+         super.onStop()
+     }
+ 
++    @Suppress("DEPRECATION")
++    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
++        super.onActivityResult(requestCode, resultCode, data)
++        com.armsx2.tirso.TirsoPlayer.onActivityResult(this, requestCode, resultCode, data)
++    }
++
+     override fun onResume() {
+         super.onResume()
+         runCatching { com.armsx2.SecondScreen.setForeground(applicationContext, true) }
+diff --git a/platforms/android/app/src/main/java/com/armsx2/ui/WindowImpl.kt b/platforms/android/app/src/main/java/com/armsx2/ui/WindowImpl.kt
+index ae4c3f8..97ff019 100644
+--- a/platforms/android/app/src/main/java/com/armsx2/ui/WindowImpl.kt
++++ b/platforms/android/app/src/main/java/com/armsx2/ui/WindowImpl.kt
+@@ -125,7 +125,8 @@ object WindowImpl {
+                     LocalDensity provides baseDensity,
+                     LocalLayoutDirection provides LayoutDirection.Ltr,
+                 ) {
+-                    com.armsx2.ui.touch.TouchControlsOverlay()
++                    if (com.armsx2.tirso.TirsoPlayer.active) com.armsx2.tirso.TirsoPlayer.Overlay()
++                    else com.armsx2.ui.touch.TouchControlsOverlay()
+                 }
+ 
+             if (showLibrary.value && MainActivityRuntime.eState.value == EmuState.RUNNING && !overlayVisible.value) {
+@@ -147,7 +148,8 @@ object WindowImpl {
+             }
+ 
+             if (overlayVisible.value) {
+-                com.armsx2.ui.emulation.EmulationMenuScreen()
++                if (com.armsx2.tirso.TirsoPlayer.active) com.armsx2.tirso.TirsoPlayer.MenuHost()
++                else com.armsx2.ui.emulation.EmulationMenuScreen()
+             }
+ 
+             // Full manager screen over the paused game; dismiss (back or the screen's
+diff --git a/platforms/android/settings.gradle.kts b/platforms/android/settings.gradle.kts
+index bbd5d73..edf1927 100644
+--- a/platforms/android/settings.gradle.kts
++++ b/platforms/android/settings.gradle.kts
+@@ -7,18 +7,19 @@ pluginManagement {
+                 includeGroupByRegex("androidx.*")
+             }
+         }
++        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
+         mavenCentral()
+         gradlePluginPortal()
+     }
+ }
+-plugins {
+-    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+-}
++// (Tirso build: foojay toolchain resolver removed; a JDK is already installed)
+ dependencyResolutionManagement {
+     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+     repositories {
+         google()
++        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
+         mavenCentral()
++        maven { url = uri("https://jitpack.io") }  // Tirso: RadialGamePad
+         // Discord Social SDK ships as a local .aar. Consumed as a dependency rather than unpacked
+         // by hand: hand-staging silently dropped its consumer proguard rules (crash at boot), its
+         // <queries> entry, and its androidx.browser dependency (sign-in completed and the result

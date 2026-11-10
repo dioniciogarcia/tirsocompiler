@@ -1,0 +1,20 @@
+{
+  "apk": "template.apk",
+  "frontend": "LibretroDroid 0.14.0, RadialGamePad 08d1dd95",
+  "min_android": "8.0",
+  "tested": true,
+  "version": "1.7.0",
+  "name": "Tirso PSP player",
+  "engine": "PPSSPP",
+  "core": "libppsspp_libretro_android.so",
+  "core_build": "libretro buildbot nightly 2026-11-04 (ppsspp c68f43c7311b)",
+  "system_files": "ppsspp_system.zip (libretro PPSSPP assets 2026-11-04)",
+  "sha256": "89a6d01bc776db36c61193c5887b349fcac50dd16049c7e64b43ad6a61648e5b",
+  "source": "templates/source.zip (flavor psp)",
+  "apk_tv": "template-tv.apk",
+  "sha256_tv": "a1fbc567d4b3564ae76e9614c1efd07cb104022dbc55233aa3b7d2f3e28629f9",
+  "abi": "phone: arm64-v8a; tv: arm64-v8a + armeabi-v7a",
+  "tested_on": "Galaxy S25, S24, S20 FE (4 Nov 2026)",
+  "tv_tested": false,
+  "changes": "New: Game information in the in-game menu (box art, details, description, screenshots) for games built with Batch Build. Menu items keep their order when some are hidden."
+}

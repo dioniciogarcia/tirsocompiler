@@ -1,0 +1,9 @@
+Tools bundled with Tirso Compiler (used only on this PC to package APKs)
+
+jre-windows-x64.zip   Eclipse Temurin JRE 21.0.13+9 (Adoptium). GPLv2 with Classpath Exception.
+                      https://adoptium.net
+apktool.jar           Apktool 3.0.3 by Connor Tumbleson and contributors. Apache License 2.0.
+                      https://apktool.org
+uber-apk-signer.jar   uber-apk-signer 1.3.0 by Patrick Favre-Bulle. Apache License 2.0.
+                      Includes Google's apksigner and zipalign (AOSP, Apache License 2.0).
+                      https://github.com/patrickfav/uber-apk-signer

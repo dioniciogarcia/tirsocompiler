@@ -1,0 +1,16 @@
+{
+  "apk": "template.apk",
+  "name": "Tirso GameCube/Wii player",
+  "version": "2.3.0",
+  "engine": "Dolphin",
+  "frontend": "LibretroDroid 0.14.0, RadialGamePad 08d1dd95",
+  "min_android": "8.0",
+  "tested": true,
+  "core": "libdolphin_libretro_android.so",
+  "core_build": "built from source: libretro/dolphin 32c61f9 + Tirso patch (templates/source.zip: dolphin-tirso.patch), arm64-v8a",
+  "system_files": "dolphin_system.zip (libretro Dolphin.zip Sys assets, 2026-11-05)",
+  "sha256": "2ac5f7657dcf162dbb621c78b75d5a413d6789134331b7fb055411b1c97e6f0f",
+  "source": "templates/source.zip (flavor dolphin)",
+  "abi": "phone: arm64-v8a",
+  "changes": "New: Game information in the in-game menu (box art, details, description, screenshots) for games built with Batch Build. Menu items keep their order when some are hidden."
+}

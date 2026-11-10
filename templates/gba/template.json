@@ -1,0 +1,18 @@
+{
+  "apk": "template.apk",
+  "apk_tv": "template-tv.apk",
+  "name": "Tirso GBA player",
+  "version": "1.2.0",
+  "engine": "mGBA",
+  "frontend": "LibretroDroid 0.14.0, RadialGamePad 08d1dd95",
+  "min_android": "8.0",
+  "tested": true,
+  "core": "libmgba_libretro_android.so",
+  "core_build": "libretro buildbot nightly 2026-11-04 (libretro/mgba)",
+  "source": "templates/source.zip (flavor gba)",
+  "abi": "phone: arm64-v8a; tv: arm64-v8a + armeabi-v7a",
+  "tv_tested": false,
+  "changes": "New: Game information in the in-game menu (box art, details, description, screenshots) for games built with Batch Build. Menu items keep their order when some are hidden.",
+  "sha256": "0c92d9066d838f1b77b0bc7532f6a7af5a7a9033d40ff5b85d7ebc356fd6c21a",
+  "sha256_tv": "09177b16456f7a065f962d0b5b202a96aad5675a85171229f62872cef19d4044"
+}
