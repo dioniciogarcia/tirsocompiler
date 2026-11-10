@@ -1,7 +1,7 @@
 {
   "apk": "template.apk",
   "name": "Tirso GameCube/Wii player",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "engine": "Dolphin",
   "frontend": "LibretroDroid 0.14.0, RadialGamePad 08d1dd95",
   "min_android": "8.0",
@@ -9,8 +9,8 @@
   "core": "libdolphin_libretro_android.so",
   "core_build": "built from source: libretro/dolphin 32c61f9 + Tirso patch (templates/source.zip: dolphin-tirso.patch), arm64-v8a",
   "system_files": "dolphin_system.zip (libretro Dolphin.zip Sys assets, 2026-11-05)",
-  "sha256": "a5850a9f66c2643a84bc69f3276f74afe38449143d1e8bd88e7bf4e01726b0a3",
+  "sha256": "8bf0bac9b35f1ba9b3830c8a76108f4149afaff0d16fdc600c67deee8dcd0785",
   "source": "templates/source.zip (flavor dolphin)",
   "abi": "phone: arm64-v8a",
-  "changes": "Two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; Screen filter in the pause menu; saves backed up automatically to Downloads/Tirso Saves (TirsoDrive can restore them); TV game mode for less input delay; DS microphone; GameCube/Wii start with the graphics chosen in Tirso."
+  "changes": "Cheats menu in the pause menu (tick the cheats you want; they stay on next time). Two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; Screen filter in the pause menu; saves backed up automatically to Downloads/Tirso Saves (TirsoDrive can restore them); TV game mode for less input delay; DS microphone; GameCube/Wii start with the graphics chosen in Tirso."
 }

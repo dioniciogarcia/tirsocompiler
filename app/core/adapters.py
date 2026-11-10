@@ -264,6 +264,63 @@ class GbaAdapter(EngineAdapter):
         return v
 
 
+class Ps1Adapter(EngineAdapter):
+    """PlayStation: SwanStation (libretro; GPL). Needs your own PlayStation BIOS, packed into the app."""
+    console = "ps1"
+    engine = "SwanStation"
+    template = "ps1"
+    rom_formats = (".cue", ".bin", ".chd", ".pbp", ".iso")
+    pad = "ps1"
+    aspect = 4 / 3
+
+    # Real SwanStation option values (strings in libswanstation_libretro_android.so).
+    COMMON = {
+        "swanstation_GPU_Renderer": "OpenGL",
+        "swanstation_BIOS_PatchFastBoot": "true",           # skip the PlayStation logo
+        "swanstation_Console_Region": "Auto",
+        "swanstation_CDROM_RegionCheck": "false",
+        "swanstation_Controller1_AnalogDPadInDigitalMode": "true",   # the left stick works as a D-pad too
+        "swanstation_Controller_EnableRumble": "true",
+        "swanstation_Display_ShowOSDMessages": "false",
+        "swanstation_GPU_TrueColor": "true",
+        "swanstation_GPU_PGXPEnable": "true",               # steadier 3D (no wobbling polygons)
+        "swanstation_GPU_PGXPCulling": "true",
+        "swanstation_GPU_PGXPTextureCorrection": "true",
+    }
+    SCALE = {"battery": "1", "performance": "2", "balanced": "2", "quality": "3"}
+    RES = {"720p": "3", "1080p": "4", "1440p": "6"}
+    BIOS_NAME = {"Japan": "scph5500.bin", "USA": "scph5501.bin", "Europe": "scph5502.bin"}
+
+    def variables(self, profile, settings=None):
+        settings = settings or {}
+        v = dict(self.COMMON)
+        v["swanstation_GPU_ResolutionScale"] = self.RES.get(settings.get("resolution")) or self.SCALE.get(profile, "2")
+        wide = bool(settings.get("widescreen"))
+        v["swanstation_GPU_WidescreenHack"] = "true" if wide else "false"
+        v["swanstation_Display_AspectRatio"] = "16:9" if wide else "4:3"
+        if self.is_tv(settings):
+            v["swanstation_GPU_ResolutionScale"] = self.RES.get(settings.get("resolution")) or "1"  # TV chips are slow
+            v["swanstation_GPU_PGXPEnable"] = "false"
+        return v
+
+    def screen(self, settings):
+        return "overlay", (16 / 9 if settings.get("widescreen") else 4 / 3), None
+
+    def rom_asset_name(self, rom_path):
+        ext = Path(rom_path).suffix.lower()
+        return "game.bin" if ext in (".cue", ".bin") else "game" + ext
+
+    def finish_json(self, cfg, bios=None, cue_sheet=None):
+        """BIOS file name the engine looks for (by the BIOS's region), and the cue sheet for BIN/CUE discs."""
+        name = self.BIOS_NAME.get((bios or {}).get("region") or "", "scph5501.bin")
+        cfg["bios_file"] = name
+        for key in ("swanstation_BIOS_PathNTSCU", "swanstation_BIOS_PathNTSCJ", "swanstation_BIOS_PathPAL"):
+            cfg.setdefault("variables", {})[key] = name
+        cfg["controller_type"] = 261   # SwanStation's "Analog Controller (DualShock)" (RETRO_DEVICE_SUBCLASS(ANALOG, 0)) in port 1
+        if cue_sheet:
+            cfg["cue_sheet"] = cue_sheet
+
+
 class PspAdapter(EngineAdapter):
     console = "psp"
     engine = "PPSSPP"
@@ -280,7 +337,8 @@ class PspAdapter(EngineAdapter):
         "quality": {"ppsspp_internal_resolution": "1440x816"},
     }
     COMMON = {"ppsspp_backend": "opengl", "ppsspp_cpu_core": "JIT", "ppsspp_frame_duplication": "enabled",
-              "ppsspp_auto_frameskip": "disabled"}
+              "ppsspp_auto_frameskip": "disabled",
+              "ppsspp_cheats": "enabled"}  # the pause menu's Cheats (CWCheat codes packed by Tirso)
 
     def rom_asset_name(self, rom_path):
         return "game.cso"  # ISOs are compressed to CSO before packaging
@@ -365,6 +423,10 @@ class DolphinAdapter(EngineAdapter):
         "dolphin_enable_rumble": "enabled",
         "dolphin_osd_enabled": "disabled",
         "dolphin_ir_mode": "1",                     # right stick = Wii pointer (absolute)
+        # Cheats: Dolphin lists the Action Replay / Gecko codes from its game settings at start, and the
+        # pause menu's Cheats turns them on.
+        "dolphin_cheats_enabled": "enabled",
+        "dolphin_cheats_import": "enabled",
     }
     EFB = {"battery": "1", "performance": "1", "balanced": "1", "quality": "2"}
     RES = {"720p": "2", "1080p": "3", "1440p": "4"}
@@ -428,7 +490,7 @@ class WiiAdapter(DolphinAdapter):
         return "gc" if c == "gamecube" else "wii_" + c
 
 
-ADAPTERS = {a.console: a for a in (N64Adapter(), NdsAdapter(), GbaAdapter(), PspAdapter(), Ps2Adapter(), GcAdapter(), WiiAdapter())}
+ADAPTERS = {a.console: a for a in (N64Adapter(), NdsAdapter(), GbaAdapter(), Ps1Adapter(), PspAdapter(), Ps2Adapter(), GcAdapter(), WiiAdapter())}
 
 
 def get(console):

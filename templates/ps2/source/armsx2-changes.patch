@@ -1,17 +1,18 @@
 diff --git a/platforms/android/app/build.gradle.kts b/platforms/android/app/build.gradle.kts
-index 974c5f4..643f3fa 100644
+index 974c5f4..76fa23f 100644
 --- a/platforms/android/app/build.gradle.kts
 +++ b/platforms/android/app/build.gradle.kts
-@@ -426,6 +426,7 @@ val checkNoWindowModals by tasks.registering {
+@@ -426,6 +426,8 @@ val checkNoWindowModals by tasks.registering {
  tasks.named("preBuild") { dependsOn(checkNoWindowModals) }
  
  dependencies {
-+    implementation("com.github.swordfish90:radialgamepad:08d1dd95")  // Tirso touch controls
++    // Tirso touch controls: RadialGamePad 08d1dd95 built from source (src/main/java/com/swordfish) with the
++    // two-finger fix (finger positions read relative to the pad, for phones like the Galaxy S20 FE).
      // Discord Social SDK. Its .aar's manifest declares RECORD_AUDIO plus foreground-service and
      // audio-settings permissions for its voice features, and the manifest merger folds them into
      // ARMSX2. RECORD_AUDIO is ours as well now (the emulated PS2 microphone reads the device's
 diff --git a/platforms/android/app/src/main/AndroidManifest.xml b/platforms/android/app/src/main/AndroidManifest.xml
-index 3f410d6..1520628 100644
+index 3f410d6..e59ea59 100644
 --- a/platforms/android/app/src/main/AndroidManifest.xml
 +++ b/platforms/android/app/src/main/AndroidManifest.xml
 @@ -66,10 +66,10 @@
@@ -27,7 +28,7 @@ index 3f410d6..1520628 100644
          android:supportsRtl="true"
          android:isGame="true"
          android:appCategory="game"
-@@ -89,18 +89,27 @@
+@@ -89,18 +89,33 @@
  
          <meta-data android:name="android.max_aspect" android:value="2.4" />
  
@@ -48,6 +49,12 @@ index 3f410d6..1520628 100644
                  <category android:name="android.intent.category.LAUNCHER" />
                  <category android:name="android.intent.category.GAME" />
              </intent-filter>
++            <!-- TirsoDrive (or any app) can hand this game a save backup zip to restore. -->
++            <intent-filter>
++                <action android:name="com.tirso.action.RESTORE_SAVES" />
++                <category android:name="android.intent.category.DEFAULT" />
++                <data android:mimeType="application/zip" />
++            </intent-filter>
 +        </activity>
 +
 +        <activity
@@ -73,7 +80,7 @@ index 24541bd..a072573 100644
  		installCrashLogging()
  	}
 diff --git a/platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt b/platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt
-index 45461d3..e27d664 100644
+index 45461d3..f969c96 100644
 --- a/platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt
 +++ b/platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt
 @@ -3325,7 +3325,8 @@ open class MainActivityRuntime : ComponentActivity() {
@@ -110,7 +117,11 @@ index 45461d3..e27d664 100644
          com.armsx2.ui.common.PadInput.onMotion(ev)
          if (com.armsx2.ui.home.LibraryScreensaver.onMotion(ev)) return true
          // Controller-input diagnostic (ARMSX2_JOYCON): logged before ANY gate so it
-@@ -6170,6 +6174,12 @@ open class MainActivityRuntime : ComponentActivity() {
+@@ -6167,9 +6171,16 @@ open class MainActivityRuntime : ComponentActivity() {
+         runCatching { com.armsx2.bugreport.BugReport.onActivityStopped() }
+         runCatching { NativeApp.setAppBackgrounded(true) }
+         com.armsx2.DiscordPresence.setForeground(false)
++        runCatching { com.armsx2.tirso.TirsoPlayer.onStop(this) }   // Tirso: automatic save backup
          super.onStop()
      }
  

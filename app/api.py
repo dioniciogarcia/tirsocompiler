@@ -319,7 +319,7 @@ class Api(BatchMixin):
         return self.import_bios(console_id, picked) if picked else {"results": []}
 
     def import_bios(self, console_id, path_list):
-        if console_id not in ("ps2", "nds"):
+        if console_id not in ("ps1", "ps2", "nds"):
             return {"results": [{"file": "", "ok": False, "message": "BIOS isn't used for this console."}]}
         results = []
         for p in path_list or []:

@@ -1,0 +1,18 @@
+{
+  "apk": "template.apk",
+  "frontend": "LibretroDroid 0.14.0, RadialGamePad 08d1dd95 (Tirso multi-touch fix)",
+  "min_android": "8.0",
+  "tested": false,
+  "version": "1.0.0",
+  "name": "Tirso PlayStation player",
+  "engine": "SwanStation",
+  "core": "libswanstation_libretro_android.so",
+  "core_build": "libretro buildbot nightly 2026-11-09 (swanstation 631f0fb)",
+  "sha256": "c3ef732acb781caf7c2c474e532ffd835f2a81dca828ff0f1048b21bc0ab9b54",
+  "source": "templates/source.zip (flavor ps1); SwanStation: https://github.com/libretro/swanstation",
+  "apk_tv": "template-tv.apk",
+  "sha256_tv": "8f8c44e8a7f3e57b1a9aae0513782ae18919343c01f8ab67e7587b38a11e4514",
+  "abi": "phone: arm64-v8a; tv: arm64-v8a + armeabi-v7a",
+  "tv_tested": false,
+  "changes": "First PlayStation player: SwanStation with your own BIOS, music tracks kept, cheats, DualShock, widescreen hack."
+}

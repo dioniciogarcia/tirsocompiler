@@ -1,7 +1,7 @@
 {
   "apk": "template.apk",
   "name": "Tirso PS2 player",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "engine": "ARMSX2",
   "core": "libemucore_4k.so",
   "core_build": "ARMSX2 (GPLv3) built from source, commit 1049db37fba4, play flavor, NDK 29, profile-guided optimization (ARMSX2's own pgo/armsx2.profdata, as in its official builds)",
@@ -10,10 +10,10 @@
   "icon_bg_color": "tirso_launcher_bg",
   "min_android": "8.0",
   "abi": "phone: arm64-v8a",
-  "sha256": "de79bd72b4404898fd7196583a1c2f42d0c4517053a53092737e735c3b3e7b80",
-  "source": "templates/ps2/source (Tirso boot screen + apply.py; ARMSX2 source: github.com/ARMSX2/ARMSX2 at 1049db37fba4)",
+  "sha256": "d6d0ad0223641e4683fbbd59c86cfeceee0f78d45dc591b2daf42f445b10ff34",
+  "source": "templates/ps2/source (Tirso boot screen, player and armsx2-changes.patch; ARMSX2 source: github.com/ARMSX2/ARMSX2 at 1049db37fba4)",
   "tested": true,
   "features": "widescreen (ARMSX2 widescreen patches + 16:9)",
-  "frontend": "Tirso player look: RadialGamePad 08d1dd95 touch controls + Tirso pause menu (ARMSX2 screens hidden)",
-  "changes": "Uses the GPU driver pack (e.g. Mesa Turnip) added in Tirso Compiler: installed on first start and switched on with Vulkan, on Adreno GPUs only. Keeps: BIOS first-start fix, profile-guided optimization, orientation, resolution, Tirso touch controls and menu."
+  "frontend": "Tirso player look: RadialGamePad 08d1dd95 touch controls (built from source with Tirso's two-finger fix) + Tirso pause menu (ARMSX2 screens hidden)",
+  "changes": "Cheats menu (your disc's community cheats, tick the ones you want); two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; memory cards backed up automatically to Downloads/Tirso Saves, and TirsoDrive can restore them. Keeps: GPU driver packs, profile-guided optimization, orientation, resolution, widescreen."
 }

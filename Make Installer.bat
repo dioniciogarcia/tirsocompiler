@@ -37,6 +37,7 @@ if exist "%~dp0build" rmdir /s /q "%~dp0build"
   --icon "%~dp0installer\tirso.ico" ^
   --paths "%~dp0." ^
   --add-data "%~dp0app\ui;app\ui" ^
+  --add-data "%~dp0app\data;app\data" ^
   --collect-submodules app ^
   --collect-all webview ^
   --collect-all clr_loader ^

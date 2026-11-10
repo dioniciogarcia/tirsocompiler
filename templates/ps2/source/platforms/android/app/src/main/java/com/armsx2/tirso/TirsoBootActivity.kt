@@ -54,6 +54,13 @@ class TirsoBootActivity : Activity() {
             else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
 
+        if (intent?.action == TirsoPlayer.RESTORE_ACTION && intent?.data != null) {
+            return askRestore(config, intent.data!!)
+        }
+        startPreparing(config)
+    }
+
+    private fun startPreparing(config: JSONObject) {
         Thread {
             // One preparation at a time: if Android restarts this screen (for example when it turns
             // to landscape) while files are still being copied, the second run waits for the first.
@@ -66,11 +73,14 @@ class TirsoBootActivity : Activity() {
             try {
                 installBios(config)
                 val game = findGame(config) ?: return@run
+                if (TirsoPlayer.applyStagedRestore(this))
+                    getSharedPreferences("tirso", Context.MODE_PRIVATE).edit().putBoolean("skip_autoload_once", true).commit()
                 applyDefaults()
                 applyWidescreen(config.optBoolean("widescreen", false))
                 applyResolution(config.optInt("upscale", 1))
                 applyOrientation(config.optString("orientation", "landscape"))
                 applyGpuDriver(config)
+                installCheats()
                 runOnUiThread { launch(game) }
             } catch (e: Exception) {
                 runOnUiThread { fail("The game couldn't be prepared. Check that the device has free storage.\n\n${e.message}") }
@@ -265,6 +275,50 @@ class TirsoBootActivity : Activity() {
             edit.putString("config.global", global.toString())
         }
         edit.putInt("ui.launcherOrientation", value).putInt("ui.orientation", value).commit()
+    }
+
+    /**
+     * Cheats Tirso Compiler packed (assets/tirso/cheats/<SERIAL>_<CRC>.pnach) go to ARMSX2's cheats folder,
+     * and ARMSX2's cheats switch goes on. Each cheat is still off until it's ticked in the pause menu.
+     */
+    private fun installCheats() {
+        val names = runCatching { assets.list("tirso/cheats")?.filter { it.endsWith(".pnach") } }.getOrNull().orEmpty()
+        val tirso = getSharedPreferences("tirso", Context.MODE_PRIVATE)
+        val dir = File(com.armsx2.runtime.MainActivityRuntime.assetCopyRoot(this), "cheats").apply { mkdirs() }
+        val stamp = names.joinToString(",") + ":" + runCatching { packageManager.getPackageInfo(packageName, 0).lastUpdateTime }.getOrDefault(0L)
+        if (tirso.getString("cheats_installed", null) == stamp && names.all { File(dir, it).exists() }) return
+        tirso.getString("cheats_files", null)?.split(",")?.filter { it.isNotBlank() && it !in names }?.forEach { File(dir, it).delete() }
+        names.forEach { copyAsset("tirso/cheats/$it", File(dir, it), -1) }
+        if (names.isNotEmpty()) {
+            val prefs = getSharedPreferences("ARMSX2", Context.MODE_PRIVATE)
+            val global = try { JSONObject(prefs.getString("config.global", null) ?: "{}") } catch (_: Exception) { JSONObject() }
+            if (!global.optBoolean("enableCheats", false)) {
+                global.put("enableCheats", true)
+                prefs.edit().putString("config.global", global.toString()).commit()
+            }
+        }
+        tirso.edit().putString("cheats_installed", stamp).putString("cheats_files", names.joinToString(",")).apply()
+    }
+
+    /** A save backup handed over by TirsoDrive (Intent "com.tirso.action.RESTORE_SAVES" with the zip). */
+    private fun askRestore(config: JSONObject, uri: android.net.Uri) {
+        val running = com.armsx2.runtime.MainActivityRuntime.instance != null
+        AlertDialog.Builder(this)
+            .setTitle("Restore saves?")
+            .setMessage("Your memory card saves for ${config.optString("title")} will be replaced by the ones in this backup." +
+                if (running) "\n\nThe game is open: it will close, then open it again." else "")
+            .setCancelable(false)
+            .setPositiveButton("Restore") { _, _ ->
+                // Staged now, put in place on the next start (after the game has closed and written its cards).
+                val ok = runCatching { contentResolver.openInputStream(uri)?.use { TirsoPlayer.stageRestore(this, it) } ?: false }.getOrDefault(false)
+                if (!ok) return@setPositiveButton fail("That file isn't a save backup for a PS2 game.")
+                if (running) {
+                    android.widget.Toast.makeText(this, "Saves ready. The game closes now: open it again to use them.", android.widget.Toast.LENGTH_LONG).show()
+                    com.armsx2.runtime.MainActivityRuntime.closeGame(); finish()
+                } else startPreparing(config)
+            }
+            .setNegativeButton("Cancel") { _, _ -> if (running) finish() else startPreparing(config) }
+            .show()
     }
 
     private fun launch(game: File) {

@@ -160,7 +160,8 @@
               <div class="list-row"><span class="chip ok"><span class="dot"></span>Done</span><div class="grow">PlayStation 2 (ARMSX2) with the Tirso look and custom GPU drivers</div></div>
               <div class="list-row"><span class="chip ok"><span class="dot"></span>Done</span><div class="grow">GameCube and Wii (Dolphin, Vulkan) and Game Boy Advance</div></div>
               <div class="list-row"><span class="chip ok"><span class="dot"></span>Done</span><div class="grow">Windows installer</div></div>
-              <div class="list-row"><span class="chip">Later</span><div class="grow">PlayStation 1 and PlayStation 3</div></div>
+              <div class="list-row"><span class="chip warn"><span class="dot"></span>New</span><div class="grow">PlayStation 1 (SwanStation), cheats in every game, game information and logo icons</div></div>
+              <div class="list-row"><span class="chip">Later</span><div class="grow">PlayStation 3</div></div>
             </div>
           </div>
         </div>
@@ -702,7 +703,7 @@
         <div class="list-row"><div class="grow"><h3>Your signing key</h3><div class="muted small">${t.key ? "Created " + esc(t.key_created) + ". Phones only accept updates to a game app signed with the same key, so keep a backup." : "Created automatically with your first APK."}</div></div>
           ${t.key ? `<button class="btn small" id="backupKey">Back up key</button>` : `<span class="chip">Not yet</span>`}</div>
       </div></div>
-      <div class="notice" style="margin-top:18px"><div>Engines show <b>Ready</b> only after a game built with them has been tested on a Galaxy S25, S24 and S20 FE. PlayStation 1 and PlayStation 3 are planned for a later version.</div></div>`;
+      <div class="notice" style="margin-top:18px"><div>Engines show <b>Ready</b> only after a game built with them has been tested on a Galaxy S25, S24 and S20 FE. PlayStation 3 is planned for a later version.</div></div>`;
     $$("[data-url]", el).forEach((a) => a.onclick = () => api("open_url", a.dataset.url));
     const bk = $("#backupKey", el); if (bk) bk.onclick = backupKey;
   };
@@ -752,7 +753,7 @@
             <td>${b.preferred ? `<span class="chip ok"><span class="dot"></span>Default</span>` : `<button class="btn ghost small" data-pref="${b.id}">Make default</button>`}</td>
             <td style="text-align:right"><button class="btn ghost small danger" data-rm="${b.id}">Remove</button></td></tr>`).join("")}
           </tbody></table></div>`
-          : `<div class="empty">${cid === "ps2" ? "No PS2 BIOS yet. You'll need one before any PS2 game can be built." : "None imported. DS games still work without them."}</div>`}
+          : `<div class="empty">${cid === "ps2" ? "No PS2 BIOS yet. You'll need one before any PS2 game can be built." : cid === "ps1" ? "No PlayStation BIOS yet. You'll need one (for example SCPH-5501, from your own console) before any PS1 game can be built." : "None imported. DS games still work without them."}</div>`}
       </div>`;
     };
     el.innerHTML = `
@@ -761,6 +762,7 @@
         <button class="btn ghost" id="openBios">Show BIOS folder</button></div>
       <div class="stack">
         ${section("ps2", "Required for every PS2 game. The default BIOS is placed inside each PS2 app so it starts with no setup on the phone.")}
+        ${section("ps1", "Required for every PlayStation game. A 512 KB file such as SCPH-5501 (USA), SCPH-5502 (Europe) or SCPH-5500 (Japan). The default one is placed inside each PS1 app.")}
         ${section("nds", "Optional. Import bios7.bin, bios9.bin and firmware.bin for better compatibility with some DS games.")}
         ${driverPanel("ps2", "ps2", "PS2 GPU driver", "Optional. A custom Adreno driver pack (.zip), like Mesa Turnip, that you already have. Every PS2 app built afterwards includes it and switches to Vulkan with it on phones with a Snapdragon (Adreno) GPU. Other phones keep their own driver.")}
         ${driverPanel("dolphin", "gc", "GameCube & Wii GPU driver", "Optional. A custom Adreno driver pack (.zip) for Dolphin, like Mesa Turnip. Every GameCube and Wii app built afterwards includes it and uses it with Vulkan on Snapdragon (Adreno) phones; other phones, or a driver that doesn't start, fall back to the phone's own driver. The in-game Graphics menu can switch it off.")}

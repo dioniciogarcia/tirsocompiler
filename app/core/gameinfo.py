@@ -42,6 +42,7 @@ SYSTEMS = {
     "nds": ("Nintendo - Nintendo DS", "Nintendo DS", "Nintendo DS"),
     "gba": ("Nintendo - Game Boy Advance", "Nintendo Game Boy Advance", "Game Boy Advance"),
     "psp": ("Sony - PlayStation Portable", "Sony PlayStation Portable", "PlayStation Portable"),
+    "ps1": ("Sony - PlayStation", "Sony PlayStation", "PlayStation"),
     "ps2": ("Sony - PlayStation 2", None, "PlayStation 2"),
     "gc": ("Nintendo - GameCube", "Nintendo GameCube", "GameCube"),
     "wii": ("Nintendo - Wii", "Nintendo Wii", "Wii"),

@@ -3,18 +3,18 @@
   "frontend": "LibretroDroid 0.14.0, RadialGamePad 08d1dd95",
   "min_android": "8.0",
   "tested": true,
-  "version": "1.8.0",
+  "version": "1.9.0",
   "name": "Tirso PSP player",
   "engine": "PPSSPP",
   "core": "libppsspp_libretro_android.so",
   "core_build": "libretro buildbot nightly 2026-11-04 (ppsspp c68f43c7311b)",
   "system_files": "ppsspp_system.zip (libretro PPSSPP assets 2026-11-04)",
-  "sha256": "48d0b38fe53bd9c6a311fc9d716ae2d2ce0b2bd4617b26d600bf84c621527099",
+  "sha256": "5b32f79bd43f4553de58447b04d0fdefc0ae635389e7fc9c09ce6b072e04bc00",
   "source": "templates/source.zip (flavor psp)",
   "apk_tv": "template-tv.apk",
-  "sha256_tv": "ed010c775c0a508cd6d704529fd25be6255f76954f59e356034911f9377b9526",
+  "sha256_tv": "12786fbca8f8f9eba9d3b8be6734aee58cbebb60d398a05949d3ed8c00dcb8bc",
   "abi": "phone: arm64-v8a; tv: arm64-v8a + armeabi-v7a",
   "tested_on": "Galaxy S25, S24, S20 FE (4 Nov 2026)",
   "tv_tested": false,
-  "changes": "Two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; Screen filter in the pause menu; saves backed up automatically to Downloads/Tirso Saves (TirsoDrive can restore them); TV game mode for less input delay; DS microphone; GameCube/Wii start with the graphics chosen in Tirso."
+  "changes": "Cheats menu in the pause menu (tick the cheats you want; they stay on next time). Two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; Screen filter in the pause menu; saves backed up automatically to Downloads/Tirso Saves (TirsoDrive can restore them); TV game mode for less input delay; DS microphone; GameCube/Wii start with the graphics chosen in Tirso."
 }

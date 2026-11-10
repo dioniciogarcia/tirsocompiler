@@ -425,3 +425,71 @@ class GczReader:
             offset += len(chunk)
             length -= len(chunk)
         return bytes(out)
+
+
+def merge_cue(cue_path, out_bin, cancelled=None):
+    """Turns a .cue with one or more .bin files into ONE game.bin plus a matching cue sheet (text).
+
+    Music tracks stay (PlayStation games play them). Track positions are moved to where each file
+    lands in the merged .bin. Returns the new cue sheet text, or None when cancelled.
+    """
+    import os
+    import re
+    folder = os.path.dirname(os.path.abspath(cue_path))
+    with open(cue_path, "rb") as f:
+        raw = f.read(256 * 1024)
+    text = raw[3:].decode("utf-8", "replace") if raw[:3] == b"\xef\xbb\xbf" else raw.decode("utf-8", "replace")
+    out_lines, files_in_order = ["FILE \"game.bin\" BINARY"], []
+    current_offset_frames = 0
+    current_file = None
+    for line in text.splitlines():
+        s = line.strip()
+        m = re.match(r'FILE\s+"([^"]+)"', s, re.I) or re.match(r"FILE\s+(\S+)", s, re.I)
+        if m:
+            path = _find_file(folder, m.group(1))
+            if not path:
+                raise CueError("The CUE file lists %s, which isn't next to it." % m.group(1))
+            if current_file:
+                current_offset_frames += os.path.getsize(current_file) // 2352
+            current_file = path
+            files_in_order.append(path)
+            continue
+        m = re.match(r"TRACK\s+(\d+)\s+(\S+)", s, re.I)
+        if m:
+            mode = m.group(2).upper()
+            if mode not in ("AUDIO", "MODE2/2352", "MODE1/2352"):
+                raise CueError("Track %s uses %s sectors; only 2352-byte (raw) PlayStation discs can be packed."
+                               % (m.group(1), mode))
+            out_lines.append("  TRACK %02d %s" % (int(m.group(1)), mode))
+            continue
+        m = re.match(r"INDEX\s+(\d+)\s+(\d+):(\d+):(\d+)", s, re.I)
+        if m:
+            frames = (int(m.group(2)) * 60 + int(m.group(3))) * 75 + int(m.group(4)) + current_offset_frames
+            mm, rest = divmod(frames, 75 * 60)
+            ss, ff = divmod(rest, 75)
+            out_lines.append("    INDEX %02d %02d:%02d:%02d" % (int(m.group(1)), mm, ss, ff))
+            continue
+        if re.match(r"(PREGAP|POSTGAP|FLAGS)\b", s, re.I):
+            out_lines.append("    " + s)
+    if not files_in_order:
+        raise CueError("This CUE file doesn't list any files.")
+    tmp = str(out_bin) + ".part"
+    with open(tmp, "wb") as out:
+        for p in files_in_order:
+            with open(p, "rb") as src:
+                while True:
+                    if cancelled and cancelled():
+                        out.close()
+                        os.remove(tmp)
+                        return None
+                    chunk = src.read(8 * 1024 * 1024)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+    os.replace(tmp, out_bin)
+    return "\n".join(out_lines) + "\n"
+
+
+def single_bin_cue():
+    """Cue sheet for a lone PlayStation .bin (one data track)."""
+    return 'FILE "game.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n'

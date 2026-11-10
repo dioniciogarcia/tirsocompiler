@@ -72,5 +72,9 @@ with zipfile.ZipFile(it["apk_path"]) as z:
     info = json.loads(z.read("assets/tirso/info/info.json"))
     assert info["title"] == "The Legend of Zelda: The Minish Cap" and info["description"], info
     print("info:", {k: (v[:60] if isinstance(v, str) else v) for k, v in info.items()})
+    assert "assets/tirso/cheats.json" in names, "cheats missing"
+    ch = json.loads(z.read("assets/tirso/cheats.json"))
+    assert len(ch["cheats"]) > 5 and all(c["name"] and c["code"] for c in ch["cheats"]), ch
+    print("cheats:", len(ch["cheats"]), "from", ch["source"])
 assert api.list_roms() == [] and api.list_games() == [] and api.list_builds() == []
 print("PASSED batch build")

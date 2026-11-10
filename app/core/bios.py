@@ -57,9 +57,28 @@ def inspect_nds(data: bytes) -> dict:
     return dict(valid=True, version=kind, region=None, message="%s detected by size." % label)
 
 
+PS1_REGION = {"A": "USA", "E": "Europe", "J": "Japan", "T": "Japan"}
+
+
+def inspect_ps1(data: bytes) -> dict:
+    """PlayStation BIOS: 512 KB, Sony's copyright text near the start, a version line near the end."""
+    if len(data) != 512 * 1024:
+        return dict(valid=False, message="Wrong size for a PlayStation BIOS (%d bytes). Expected 512 KB." % len(data))
+    if b"Sony Computer Entertainment" not in data[:0x1000]:
+        return dict(valid=False, message="This file doesn't look like a PlayStation BIOS (Sony's header text is missing).")
+    m = re.search(rb"System ROM Version (\d+\.\d+) (\d\d/\d\d/\d\d) ([AEJT])", data)
+    if not m:
+        return dict(valid=True, version=None, region=None, message="PlayStation BIOS (version text not found).")
+    version, date, reg = m.group(1).decode(), m.group(2).decode(), m.group(3).decode()
+    return dict(valid=True, version=version, region=PS1_REGION.get(reg, reg),
+                message="PlayStation BIOS v%s, %s, dated %s." % (version, PS1_REGION.get(reg, reg), date))
+
+
 def inspect(console: str, data: bytes) -> dict:
     if console == "ps2":
         return inspect_ps2(data)
+    if console == "ps1":
+        return inspect_ps1(data)
     if console == "nds":
         return inspect_nds(data)
     return dict(valid=False, message="BIOS files aren't needed for this console.")

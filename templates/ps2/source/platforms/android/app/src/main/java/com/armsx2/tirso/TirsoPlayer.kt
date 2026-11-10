@@ -97,6 +97,9 @@ object TirsoPlayer {
     private var rightPad: RadialGamePad? = null
     private var speedText: TextView? = null
     private var padsWanted = true
+    /** "Hide touch controls" was picked: they stay hidden until shown again from the menu (Back). */
+    private var padsLocked = false
+    private var cheatsApplied = false
     private var showSpeed = false
     private var menuShowing = false
     private var selectDown = false
@@ -164,7 +167,14 @@ object TirsoPlayer {
     fun Overlay() {
         val game = MainActivityRuntime.eState.value == EmuState.RUNNING || MainActivityRuntime.eState.value == EmuState.PAUSED
         AndroidView(factory = { ctx -> buildOverlay(activityOf(ctx) ?: ctx) }, modifier = Modifier.fillMaxSize(),
-            update = { it.visibility = if (game) View.VISIBLE else View.GONE })
+            update = {
+                it.visibility = if (game) View.VISIBLE else View.GONE
+                if (game && !cheatsApplied) {
+                    cheatsApplied = true
+                    val ctx = it.context
+                    main.postDelayed({ applyCheats(ctx) }, 4000)   // once the game's code and patches are loaded
+                }
+            })
     }
 
     private fun buildOverlay(context: Context): FrameLayout {
@@ -278,7 +288,7 @@ object TirsoPlayer {
 
     fun onTouch(activity: Activity, ev: MotionEvent) {
         if (!active(activity)) return
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN && !padsWanted && !menuShowing && hasTouch(activity)) {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN && !padsWanted && !padsLocked && !menuShowing && hasTouch(activity)) {
             padsWanted = true; updatePads()
         }
     }
@@ -319,40 +329,32 @@ object TirsoPlayer {
         if (menuShowing) return
         menuShowing = true
         val touch = hasTouch(activity)
-        val items = arrayOf(
-            "Resume",
-            "Save game state",
-            "Load game state",
-            if (!touch) "Controller help" else if (padsWanted) "Hide touch controls" else "Show touch controls",
-            "Back up saves",
-            "Restore saves",
-            "Restart game",
-            if (showSpeed) "Hide speed (fps)" else "Show speed (fps)",
-            "Controller help",
-            "Legal notices",
-            "Exit game",
-        )
+        val cheats = cheatList(activity)
+        val on = cheatsOn(activity).intersect(cheats.toSet())
+        val entries = mutableListOf<Pair<String, () -> Unit>>()
+        entries += "Resume" to { closeMenu() }
+        entries += "Save game state" to { chooseSlot(activity, save = true) }
+        entries += "Load game state" to { chooseSlot(activity, save = false) }
+        if (touch) entries += (if (padsWanted) "Hide touch controls" else "Show touch controls") to {
+            padsWanted = !padsWanted; padsLocked = !padsWanted; updatePads(); closeMenu()
+        }
+        if (cheats.isNotEmpty()) entries += ("Cheats" + if (on.isNotEmpty()) " (${on.size} on)" else "") to { showCheats(activity, cheats) }
+        entries += "Back up saves" to { backUpSaves(activity) }
+        entries += "Restore saves" to { restoreSaves(activity) }
+        entries += "Restart game" to {
+            confirm(activity, "Restart the game?", "Progress since your last in-game save will be lost.", "Restart") {
+                menuShowing = false
+                WindowImpl.overlayVisible.value = false
+                MainActivityRuntime.restart()
+            }
+        }
+        entries += (if (showSpeed) "Hide speed (fps)" else "Show speed (fps)") to { showSpeed = !showSpeed; updateSpeed(activity); closeMenu() }
+        entries += "Controller help" to { controllerHelp(activity) }
+        entries += "Legal notices" to { legal(activity) }
+        entries += "Exit game" to { exitGame(activity) }
         dialog(activity)
             .setTitle(title(activity))
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> closeMenu()
-                    1 -> chooseSlot(activity, save = true)
-                    2 -> chooseSlot(activity, save = false)
-                    3 -> if (!touch) controllerHelp(activity) else { padsWanted = !padsWanted; updatePads(); closeMenu() }
-                    4 -> backUpSaves(activity)
-                    5 -> restoreSaves(activity)
-                    6 -> confirm(activity, "Restart the game?", "Progress since your last in-game save will be lost.", "Restart") {
-                        menuShowing = false
-                        WindowImpl.overlayVisible.value = false
-                        MainActivityRuntime.restart()
-                    }
-                    7 -> { showSpeed = !showSpeed; updateSpeed(activity); closeMenu() }
-                    8 -> controllerHelp(activity)
-                    9 -> legal(activity)
-                    10 -> exitGame()
-                }
-            }
+            .setItems(entries.map { it.first }.toTypedArray()) { _, which -> entries[which].second() }
             .setOnCancelListener { closeMenu() }
             .show()
     }
@@ -424,7 +426,8 @@ object TirsoPlayer {
     private fun controllerHelp(activity: Activity) {
         dialog(activity).setTitle("Controller")
             .setMessage("Menu: Back, or Select + Start together.\nSticks, triggers and L3/R3 work as on a PS2 controller.\n" +
-                "Touch the screen to bring the on-screen controls back.")
+                "On-screen controls hide while a controller is used and come back when you touch the screen " +
+                "(unless you hid them from this menu: then they come back from here).")
             .setPositiveButton("OK") { _, _ -> closeMenu() }
             .setOnCancelListener { closeMenu() }
             .show()
@@ -434,7 +437,8 @@ object TirsoPlayer {
         val text = "This game app runs ARMSX2 (a PlayStation 2 emulator based on PCSX2), free software under the " +
             "GNU General Public License v3. Source: https://github.com/ARMSX2/ARMSX2\n\n" +
             "Tirso Compiler's changes (this screen, the controls and the menu) are in the templates\\ps2\\source " +
-            "folder of Tirso Compiler, under the same licence.\n\nOn-screen controls: RadialGamePad (Apache 2.0).\n\n" +
+            "folder of Tirso Compiler, under the same licence.\n\nOn-screen controls: RadialGamePad (GNU GPL v3, " +
+            "github.com/Swordfish90/RadialGamePad), with Tirso's two-finger fix; source in the same folder.\n\n" +
             "The game and the PS2 BIOS inside this app come from the owner's own discs and console."
         val pad = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20f, activity.resources.displayMetrics).toInt()
         val tv = TextView(activity).apply { setText(text); textSize = 13f; setPadding(pad, pad / 2, pad, pad) }
@@ -445,10 +449,65 @@ object TirsoPlayer {
             .show()
     }
 
-    private fun exitGame() {
+    private fun exitGame(activity: Activity) {
+        autoBackup(activity)
         menuShowing = false
         WindowImpl.overlayVisible.value = false
         MainActivityRuntime.closeGame()   // saves "continue" state, then closes the app
+    }
+
+    // ------------------------------------------------------------------ cheats
+    private fun cheatsDir(context: Context) = File(MainActivityRuntime.assetCopyRoot(context), "cheats")
+
+    /** Names of the cheats Tirso Compiler packed for this game (TirsoBootActivity copied them to ARMSX2's cheats folder). */
+    private fun cheatList(context: Context): List<String> {
+        val files = context.getSharedPreferences("tirso", Context.MODE_PRIVATE).getString("cheats_files", null)
+            ?.split(",")?.filter { it.isNotBlank() }.orEmpty()
+        return files.flatMap { name ->
+            runCatching { com.armsx2.PatchRepo.parseInstalled(File(cheatsDir(context), name).readText(), "cheats").second }
+                .getOrDefault(emptyList()).map { it.name }
+        }.filter { it.isNotBlank() }.distinct()
+    }
+
+    private fun cheatsOn(context: Context): Set<String> = runCatching {
+        val a = org.json.JSONArray(context.getSharedPreferences("tirso", Context.MODE_PRIVATE).getString("cheats_on", "[]"))
+        (0 until a.length()).map { a.getString(it) }.toSet()
+    }.getOrDefault(emptySet())
+
+    /** Tells ARMSX2 which of this game's cheats are on, then reloads its patches (on its own thread). */
+    private fun applyCheats(context: Context) {
+        val all = cheatList(context)
+        if (all.isEmpty()) return
+        val on = cheatsOn(context).filter { it in all }
+        Thread {
+            runCatching {
+                val serial = runCatching { NativeApp.getGameSerial() }.getOrNull()?.trim()?.uppercase()
+                    ?.takeIf { Regex("^[A-Z]{4}-\\d{5}$").matches(it) }
+                NativeApp.setEnabledPatches(true, all.toTypedArray(), on.toTypedArray(), serial)
+                NativeApp.reloadPatches()
+            }.onFailure { android.util.Log.w("TirsoPlayer", "Cheats couldn't be applied", it) }
+        }.start()
+    }
+
+    private fun showCheats(activity: Activity, cheats: List<String>) {
+        val checked = BooleanArray(cheats.size) { cheats[it] in cheatsOn(activity) }
+        val before = checked.copyOf()
+        fun save() {
+            val on = cheats.filterIndexed { i, _ -> checked[i] }
+            activity.getSharedPreferences("tirso", Context.MODE_PRIVATE).edit()
+                .putString("cheats_on", org.json.JSONArray(on).toString()).apply()
+            if (!checked.contentEquals(before)) {
+                applyCheats(activity)
+                toast(activity, if (on.isEmpty()) "Cheats off" else "${on.size} cheat(s) on")
+            }
+        }
+        dialog(activity).setTitle("Cheats")
+            .setMultiChoiceItems(cheats.toTypedArray(), checked) { _, i, value -> checked[i] = value }
+            .setPositiveButton("Done") { _, _ -> save(); closeMenu() }
+            .setNeutralButton("All off") { _, _ -> checked.fill(false); save(); closeMenu() }
+            .setOnCancelListener { save(); closeMenu() }
+            .show()
+        toast(activity, "Cheats can crash or corrupt a game: save first. Ticked cheats stay on next time.")
     }
 
     // ------------------------------------------------------------------ memory card backup
@@ -456,9 +515,101 @@ object TirsoPlayer {
 
     private const val REQ_EXPORT = 7301
     private const val REQ_IMPORT = 7302
+    const val RESTORE_ACTION = "com.tirso.action.RESTORE_SAVES"
 
     private fun safeName(context: Context) =
         title(context).replace(Regex("[^A-Za-z0-9]+"), "-").trim('-').ifBlank { "game" }
+
+    private fun consoleName(context: Context) = config(context).optString("console_name", "").ifBlank { "PlayStation 2" }
+
+    /** Same layout as the other Tirso game apps (TirsoDrive reads tirso-saves.json): memcards/ holds the PS2 memory cards. */
+    private fun writeBackup(context: Context, out: java.io.OutputStream) {
+        ZipOutputStream(out).use { zip ->
+            cardsDir(context).listFiles()?.filter { it.isFile }?.forEach { f ->
+                zip.putNextEntry(ZipEntry("memcards/" + f.name)); f.inputStream().use { it.copyTo(zip) }; zip.closeEntry()
+            }
+            val json = JSONObject().put("format", 1).put("package", context.packageName).put("title", title(context))
+                .put("console", consoleName(context))
+                .put("created", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.US).format(java.util.Date()))
+            zip.putNextEntry(ZipEntry("tirso-saves.json")); zip.write(json.toString(1).toByteArray()); zip.closeEntry()
+            zip.putNextEntry(ZipEntry("tirso-saves.txt")); zip.write("Tirso game save backup\n".toByteArray()); zip.closeEntry()
+            zip.putNextEntry(ZipEntry("tirso-ps2-saves.txt")); zip.write((context.packageName + "\n").toByteArray()); zip.closeEntry()
+        }
+    }
+
+    private fun cardsChanged(context: Context): Long =
+        cardsDir(context).listFiles()?.filter { it.isFile }?.maxOfOrNull { it.lastModified() } ?: 0L
+
+    /**
+     * Copies the memory cards to Downloads/Tirso Saves/<Game> (PlayStation 2) - saves.zip whenever they changed,
+     * so they survive uninstalling and TirsoDrive (or you) can pick them up. Called when the app goes to the
+     * background and when the game is exited from the menu.
+     */
+    fun autoBackup(context: Context) {
+        if (!active(context) || android.os.Build.VERSION.SDK_INT < 29) return
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences("tirso", Context.MODE_PRIVATE)
+        val changed = cardsChanged(app)
+        if (changed == 0L || changed <= prefs.getLong("auto_backup_at", 0L)) return
+        val name = "${title(app).replace(Regex("[\\\\/:*?\"<>|]+"), " ").trim().ifBlank { "Game" }} (${consoleName(app)}) - saves.zip"
+        Thread {
+            runCatching {
+                val resolver = app.contentResolver
+                var uri = prefs.getString("auto_backup_uri", null)?.let { Uri.parse(it) }
+                val out = uri?.let { runCatching { resolver.openOutputStream(it, "wt") }.getOrNull() } ?: run {
+                    val values = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
+                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "Download/Tirso Saves")
+                    }
+                    uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    uri?.let { resolver.openOutputStream(it, "wt") }
+                }
+                out?.use { writeBackup(app, it) } ?: error("no output")
+                prefs.edit().putLong("auto_backup_at", changed).putString("auto_backup_uri", uri.toString()).apply()
+            }.onFailure { android.util.Log.w("TirsoPlayer", "Automatic save backup failed", it) }
+        }.start()
+    }
+
+    /** From MainActivityRuntime.onStop. */
+    fun onStop(activity: Activity) {
+        if (active(activity) && gameOn()) autoBackup(activity)
+    }
+
+    private fun stagingDir(context: Context) = File(context.filesDir, "tirso-restore")
+
+    /**
+     * Reads a backup zip into a waiting folder. The cards are put in place by [applyStagedRestore] on the next
+     * start, after the game has closed (ARMSX2 writes its memory cards when a game closes).
+     */
+    fun stageRestore(context: Context, input: java.io.InputStream): Boolean {
+        var marker = false
+        val restored = mutableListOf<Pair<String, ByteArray>>()
+        ZipInputStream(input).use { zip ->
+            while (true) {
+                val e = zip.nextEntry ?: break
+                if (e.name == "tirso-ps2-saves.txt" || e.name == "tirso-saves.json") marker = true
+                else if (e.name.startsWith("memcards/") && !e.isDirectory && !e.name.contains(".."))
+                    restored += File(e.name).name to zip.readBytes()
+            }
+        }
+        if (!marker || restored.isEmpty()) return false
+        val dir = stagingDir(context)
+        dir.deleteRecursively(); dir.mkdirs()
+        restored.forEach { (name, bytes) -> File(dir, name).writeBytes(bytes) }
+        return true
+    }
+
+    /** Puts staged cards in place (before the game starts). True when there were some. */
+    fun applyStagedRestore(context: Context): Boolean {
+        val files = stagingDir(context).listFiles()?.filter { it.isFile }.orEmpty()
+        if (files.isEmpty()) return false
+        val cards = cardsDir(context).apply { mkdirs() }
+        files.forEach { f -> f.copyTo(File(cards, f.name), overwrite = true) }
+        stagingDir(context).deleteRecursively()
+        context.getSharedPreferences("tirso", Context.MODE_PRIVATE).edit().remove("auto_backup_at").apply()
+        return true
+    }
 
     private fun backUpSaves(activity: Activity) {
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
@@ -481,44 +632,18 @@ object TirsoPlayer {
         if (uri == null) { closeMenu(); return true }
         if (requestCode == REQ_EXPORT) {
             val ok = runCatching {
-                activity.contentResolver.openOutputStream(uri)?.use { out ->
-                    ZipOutputStream(out).use { zip ->
-                        zip.putNextEntry(ZipEntry("tirso-ps2-saves.txt"))
-                        zip.write((activity.packageName + "\n").toByteArray()); zip.closeEntry()
-                        cardsDir(activity).listFiles()?.filter { it.isFile }?.forEach { f ->
-                            zip.putNextEntry(ZipEntry("memcards/" + f.name)); f.inputStream().use { it.copyTo(zip) }; zip.closeEntry()
-                        }
-                    }
-                } ?: error("no stream")
+                activity.contentResolver.openOutputStream(uri)?.use { writeBackup(activity, it) } ?: error("no stream")
             }.isSuccess
             toast(activity, if (ok) "Saves backed up" else "Backup failed")
             closeMenu()
         } else {
-            val ok = runCatching {
-                var marker = false
-                val restored = mutableListOf<Pair<String, ByteArray>>()
-                activity.contentResolver.openInputStream(uri)?.use { input ->
-                    ZipInputStream(input).use { zip ->
-                        while (true) {
-                            val e = zip.nextEntry ?: break
-                            if (e.name == "tirso-ps2-saves.txt") marker = true
-                            else if (e.name.startsWith("memcards/") && !e.isDirectory && !e.name.contains(".."))
-                                restored += e.name.removePrefix("memcards/") to zip.readBytes()
-                        }
-                    }
-                }
-                if (!marker || restored.isEmpty()) error("not a backup")
-                val dir = cardsDir(activity).apply { mkdirs() }
-                restored.forEach { (name, bytes) -> File(dir, File(name).name).writeBytes(bytes) }
-            }.isSuccess
+            val ok = runCatching { activity.contentResolver.openInputStream(uri)?.use { stageRestore(activity, it) } ?: false }
+                .getOrDefault(false)
             if (ok) {
                 Toast.makeText(activity, "Saves restored. Open the game again to use them.", Toast.LENGTH_LONG).show()
                 menuShowing = false
                 WindowImpl.overlayVisible.value = false
-                // Next launch starts the game fresh (not from the "continue" state), so it reads the
-                // restored memory card. TirsoBootActivity turns "continue" back on after that launch.
-                activity.getSharedPreferences("tirso", Context.MODE_PRIVATE).edit().putBoolean("skip_autoload_once", true).commit()
-                MainActivityRuntime.closeGame()
+                MainActivityRuntime.closeGame()   // the next start puts the cards in place and starts fresh
             } else {
                 toast(activity, "That file isn't a save backup for this game")
                 closeMenu()

@@ -2,7 +2,7 @@
   "apk": "template.apk",
   "apk_tv": "template-tv.apk",
   "name": "Tirso GBA player",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "engine": "mGBA",
   "frontend": "LibretroDroid 0.14.0, RadialGamePad 08d1dd95",
   "min_android": "8.0",
@@ -12,7 +12,7 @@
   "source": "templates/source.zip (flavor gba)",
   "abi": "phone: arm64-v8a; tv: arm64-v8a + armeabi-v7a",
   "tv_tested": false,
-  "changes": "Two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; Screen filter in the pause menu; saves backed up automatically to Downloads/Tirso Saves (TirsoDrive can restore them); TV game mode for less input delay; DS microphone; GameCube/Wii start with the graphics chosen in Tirso.",
-  "sha256": "b3c1bd2c3dbc2cb886888175b49f67a8583b27b2d823070af42256e49afb1177",
-  "sha256_tv": "532cbb921a5278c2e0aad9014e9988c4d224b70988f58bb337d36be2adf53079"
+  "changes": "Cheats menu in the pause menu (tick the cheats you want; they stay on next time). Two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; Screen filter in the pause menu; saves backed up automatically to Downloads/Tirso Saves (TirsoDrive can restore them); TV game mode for less input delay; DS microphone; GameCube/Wii start with the graphics chosen in Tirso.",
+  "sha256": "8858b4af2ff4a4744a5f78ced9069f4df7e10570a2573d03bd5be26475d3d332",
+  "sha256_tv": "c6e12f58bfd0053697c47f7b03ed29f08ce03af7da301217700a3259400a0bfa"
 }

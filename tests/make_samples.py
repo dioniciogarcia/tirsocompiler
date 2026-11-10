@@ -224,3 +224,24 @@ def write_ps2_cue_games(folder: Path):
     (folder / "Lone Raw.bin").write_bytes(raw_cd(d))
     out["Lone Raw.bin"] = d
     return out
+
+
+def ps1_bios():
+    """A 512 KB file shaped like a PlayStation BIOS (Sony text + version line). Not a real BIOS."""
+    data = bytearray(512 * 1024)
+    data[0x108:0x108 + 39] = b"Sony Computer Entertainment Inc. TEST\x00\x00"
+    v = b"System ROM Version 4.5 05/25/00 A"
+    data[0x7FF32:0x7FF32 + len(v)] = v
+    return bytes(data)
+
+
+def write_ps1_cue_game(folder: Path, serial=b"SLUS_000.67"):
+    """A PlayStation BIN/CUE (data track + one music track in its own file)."""
+    folder.mkdir(parents=True, exist_ok=True)
+    data = iso({"SYSTEM.CNF": b"BOOT = cdrom:\\" + serial + b";1\r\nTCB = 4\r\nEVENT = 10\r\n"}, b"PS1TEST") + b"\x33" * (1024 * 1024)
+    (folder / "PS1 Test (Track 1).bin").write_bytes(raw_cd(data))
+    (folder / "PS1 Test (Track 2).bin").write_bytes(b"\x07\x08" * 2352 * 50)
+    (folder / "PS1 Test.cue").write_text(
+        'FILE "PS1 Test (Track 1).bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n'
+        'FILE "PS1 Test (Track 2).bin" BINARY\n  TRACK 02 AUDIO\n    INDEX 00 00:00:00\n    INDEX 01 00:02:00\n')
+    return folder / "PS1 Test.cue"

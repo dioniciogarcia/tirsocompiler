@@ -245,6 +245,8 @@ class ApkBuilder:
         else:
             cfg = ad.game_json(g, rom, build_id, payload_name, payload_size)
         cfg.setdefault("core", info.get("core"))
+        if hasattr(ad, "finish_json"):
+            ad.finish_json(cfg, bios=self.bios, cue_sheet=getattr(self, "cue_sheet", None))
         if self.gpu_driver:
             cfg["gpu_driver"] = "gpu_driver.zip"
             cfg["gpu_driver_name"] = self.gpu_driver["name"]
@@ -270,6 +272,7 @@ class ApkBuilder:
         info_dir = Path(g["info_dir"]) if g.get("info_dir") else None
         if info_dir and (info_dir / "info.json").exists():
             self._add_info(unsigned, info_dir)
+        self._add_cheats(unsigned, g)
         if self.gpu_driver:
             self.log("Adding the GPU driver to the APK…")
             with zipfile.ZipFile(unsigned, "a") as z:
@@ -320,6 +323,29 @@ class ApkBuilder:
         src = Path(rom["path"])
         ext = src.suffix.lower()
         track = None
+        self.cue_sheet = None
+        if ad.console == "ps1" and ext in (".cue", ".bin"):
+            from .discs import CueError, merge_cue, single_bin_cue
+            if ext == ".bin":
+                self.cue_sheet = single_bin_cue()
+                self.log("Game file: %s (%.1f MB), one data track" % (src.name, src.stat().st_size / 1048576))
+                return str(src), "game.bin"
+            cache = paths.sub("cache") / ("%s-ps1.bin" % (rom["sha1"] or "nohash"))
+            sheet_file = cache.with_suffix(".cue")
+            if cache.exists() and sheet_file.exists() and rom["sha1"]:
+                self.log("Using the disc image made earlier (%.0f MB)." % (cache.stat().st_size / 1048576))
+                self.cue_sheet = sheet_file.read_text(encoding="utf-8")
+            else:
+                self.log("Joining the disc's tracks into one file (music tracks included)…")
+                try:
+                    sheet = merge_cue(str(src), str(cache), cancelled=self.cancelled)
+                except CueError as e:
+                    raise ToolError(str(e))
+                if sheet is None:
+                    raise BuildCancelled()
+                sheet_file.write_text(sheet, encoding="utf-8")
+                self.cue_sheet = sheet
+            return str(cache), "game.bin"
         if getattr(ad, "compress_iso", False) and ext in (".cue", ".bin"):
             from .discs import CueError, parse_cue, raw_track
             if ext == ".cue":
@@ -376,7 +402,50 @@ class ApkBuilder:
                 self.log("Compressed %.0f MB to %.0f MB." % (rom["size"] / 1048576, size / 1048576))
             return str(cache), "game.cso"
         self.log("Game file: %s (%.1f MB)" % (src.name, src.stat().st_size / 1048576))
-        return str(src), ad.rom_asset_name(str(src)) if ad.console not in ("psp", "ps2", "gc", "wii") else "game" + ext
+        return str(src), ad.rom_asset_name(str(src)) if ad.console not in ("psp", "ps2", "gc", "wii", "ps1") else "game" + ext
+
+    def _add_cheats(self, apk, g):
+        """Cheats for the pause menu (assets/tirso/cheats.json), when the game is in the cheat collection."""
+        from . import cheats, gameinfo
+        console = self.rom.get("console")
+        if console == "ps2":
+            return self._add_ps2_cheats(apk)
+        if not cheats.supported(console):
+            return
+        try:
+            name = cheats.official_name(g, self.rom)
+            found = cheats.fetch(console, name, serial=self.rom.get("serial"))
+        except gameinfo.Offline:
+            self.log("Cheats couldn't be downloaded right now (no internet?). Building without them.")
+            return
+        except Exception as e:  # cheats are a bonus: never fail the build for them
+            self.log("Cheats skipped: %s" % e)
+            return
+        if not found or not found.get("cheats"):
+            self.log("No cheats found for this game.")
+            return
+        data = {"source": found.get("source"), "cheats": found["cheats"]}
+        with zipfile.ZipFile(apk, "a") as z:
+            z.writestr("assets/tirso/cheats.json", json.dumps(data, ensure_ascii=False), compress_type=zipfile.ZIP_DEFLATED)
+        self.log("Cheats added: %d (pause menu > Cheats, all off until you turn them on)." % len(found["cheats"]))
+
+    def _add_ps2_cheats(self, apk):
+        """PS2: the community .pnach cheats for this exact disc (matched by its game code and checksum)."""
+        from . import cheats, gameinfo
+        try:
+            found = cheats.fetch_ps2(self.rom["path"])
+        except gameinfo.Offline:
+            self.log("Cheats couldn't be downloaded right now (no internet?). Building without them.")
+            return
+        except Exception as e:
+            self.log("Cheats skipped: %s" % e)
+            return
+        if not found:
+            self.log("No cheats found for this game.")
+            return
+        with zipfile.ZipFile(apk, "a") as z:
+            z.writestr("assets/tirso/cheats/" + found["file"], found["text"], compress_type=zipfile.ZIP_DEFLATED)
+        self.log("Cheats added: %d (pause menu > Cheats, all off until you turn them on)." % found["count"])
 
     def _add_info(self, apk, info_dir):
         """Game information for the in-game "Game information" window: assets/tirso/info/."""

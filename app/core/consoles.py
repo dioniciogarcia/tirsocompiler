@@ -147,15 +147,15 @@ CONSOLES = [
         "name": "PlayStation",
         "short": "PS1",
         "color": "#9AA3AE",
-        "engine": "To be chosen",
-        "engine_source": "",
-        "license": "",
-        "extensions": [".bin", ".cue", ".chd", ".pbp", ".iso"],
-        "bios": {"required": False, "note": "Depends on the engine chosen later."},
+        "engine": "SwanStation",
+        "engine_source": "https://github.com/libretro/swanstation",
+        "license": "GPL-3.0",
+        "extensions": [".cue", ".bin", ".chd", ".pbp", ".iso"],
+        "bios": {"required": True, "note": "Required. Import a BIOS dumped from your own PlayStation (for example SCPH-5501)."},
         "features": ["widescreen", "tv"],
-        "widescreen_how": "The PS1 engine's widescreen hack. Applied when PS1 support arrives in a later version.",
-        "phase": 7,
-        "status": "Planned for a later version",
+        "widescreen_how": "SwanStation's widescreen hack (draws a wider 16:9 view; works in most 3D games).",
+        "phase": 5,
+        "status": "Ready to test",
         "buildable": False,
     },
 ]
@@ -181,6 +181,10 @@ RESOLUTIONS = {
             ("720p", "720p", "2x the Wii resolution (Dolphin: 2x Native for 720p)"),
             ("1080p", "1080p", "3x (Dolphin: 3x Native for 1080p)"),
             ("1440p", "1440p", "4x (Dolphin: 4x Native for 1440p)")],
+    "ps1": [("auto", "Auto", "Set by the performance profile"),
+            ("720p", "720p", "3x the PlayStation resolution"),
+            ("1080p", "1080p", "4x (about 1080p)"),
+            ("1440p", "1440p", "6x (about 1440p)")],
     "ps2": [("auto", "Auto", "Original PS2 resolution"),
             ("720p", "720p", "2x the PS2 resolution"),
             ("1080p", "1080p", "3x the PS2 resolution"),
@@ -200,7 +204,7 @@ SCREEN_FILTERS = [
     ("lcd", "Handheld LCD", "Shows the pixel grid like the original handheld screen."),
     ("crt", "CRT TV", "Scanlines like an old TV."),
 ]
-FILTER_DEFAULT = {"gba": "sharp", "nds": "sharp", "n64": "default", "psp": "default"}
+FILTER_DEFAULT = {"gba": "sharp", "nds": "sharp", "n64": "default", "psp": "default", "ps1": "default"}
 for _c in CONSOLES:
     if _c["id"] in FILTER_DEFAULT:
         _c["screen_filters"] = [{"id": i, "name": n, "desc": d} for i, n, d in SCREEN_FILTERS]

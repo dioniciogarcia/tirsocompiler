@@ -1,8 +1,8 @@
 {
   "name": "Tirso N64 player",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "apk": "template.apk",
-  "sha256": "6eecaf627382450fe136d5975769a0c9a0d14c981a15cefa413bd383e8626f3a",
+  "sha256": "db4f6a9b798bc7592f6e23dbe3110dd156e83b90ed145c1bcc7aaa7b27ca90c8",
   "engine": "Mupen64Plus-Next",
   "core": "libmupen64plus_next_gles3_libretro_android.so",
   "core_build": "libretro buildbot nightly 2026-11-04 (develop 15bada8)",
@@ -12,8 +12,8 @@
   "tested_on": "Galaxy S25, S24, S20 FE (4 Nov 2026)",
   "source": "templates/source.zip (flavor n64)",
   "apk_tv": "template-tv.apk",
-  "sha256_tv": "5e915c1d8030dbf85df2f31ded3336d258759014b65fa1d83a87ee5f31ee9717",
+  "sha256_tv": "215ae5fc2dc52566ea0357a1c679c949f73d839d812088de3fb202a168834dc8",
   "abi": "phone: arm64-v8a; tv: arm64-v8a + armeabi-v7a",
   "tv_tested": false,
-  "changes": "Two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; Screen filter in the pause menu; saves backed up automatically to Downloads/Tirso Saves (TirsoDrive can restore them); TV game mode for less input delay; DS microphone; GameCube/Wii start with the graphics chosen in Tirso."
+  "changes": "Cheats menu in the pause menu (tick the cheats you want; they stay on next time). Two touch buttons at once work on every phone (Galaxy S20 FE fix); Hide touch controls stays hidden until Back; Screen filter in the pause menu; saves backed up automatically to Downloads/Tirso Saves (TirsoDrive can restore them); TV game mode for less input delay; DS microphone; GameCube/Wii start with the graphics chosen in Tirso."
 }

@@ -137,13 +137,22 @@ VERSION 1.1
     DS games can use the phone's microphone (asked once; "Microphone" in the menu).
   - PS2 BIN/CUE: a .bin that was renamed without its .cue is found anyway, and
     BIN/CUE discs in a folder are added even when Tirso can't tell the console.
+  - New console: PlayStation (PS1), played with SwanStation. Import your own PS1 BIOS
+    first (BIOS Manager > PlayStation: scph5500/5501/5502 or any real PS1 BIOS dump).
+    BIN/CUE discs with music tracks are joined into one file, music kept.
+  - Cheats in every game's pause menu ("Cheats"): Tirso downloads the known cheats for
+    each game while building (single games and Batch Build) and puts them inside the
+    app. All start off; tick the ones you want and they stay on next time.
+    N64, DS, GBA, PS1, PSP: RetroArch's cheat collection. PS2: two community .pnach
+    collections, matched to your exact disc. GameCube/Wii: Dolphin's own cheat list.
+    Cheats can crash or corrupt a game, so save first.
 
 SAVE BACKUPS (FOR TIRSODRIVE)
   - Every game app copies its saves to Download/Tirso Saves on the phone whenever
     they change: "<Game> (<Console>) - saves.zip". In-game saves, memory cards and
     manual save states are included (not the automatic "where you left off" state).
   - The zip holds tirso-saves.json: {"format": 1, "package", "title", "console",
-    "created"}, plus saves/ and states/ folders.
+    "created"}, plus saves/ and states/ folders (PS2 games: memcards/ instead).
   - To restore, another app (TirsoDrive) opens the game with
     Intent("com.tirso.action.RESTORE_SAVES") and the zip as data (type
     application/zip, with read permission). The game asks before replacing saves.

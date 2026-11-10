@@ -311,3 +311,23 @@ for x in res["results"]:
 assert any(g["app_name"] == "Renamed One" for g in api.list_games())
 print("BATCH PASSED: 3 GBA APKs built in a queue (one removed), saved under",
       Path(done[res["results"][0]["build_id"]]["apk_path"]).parent)
+
+
+# ---- PlayStation (SwanStation): BIOS required, BIN/CUE with a music track joined into one .bin ----
+ps1_dir = folder / "ps1"
+cue = make_samples.write_ps1_cue_game(ps1_dir)
+(ps1_dir / "SCPH-5501.bin").write_bytes(make_samples.ps1_bios())
+bres = api.import_bios("ps1", [str(ps1_dir / "SCPH-5501.bin")])
+assert bres["results"][0]["ok"], bres
+b, cfg, names = build(cue, "ps1", "PS1 Test", "com.tirso.ps1test", widescreen=True, resolution="1080p")
+assert cfg["rom"] == "game.bin" and cfg["bios_file"] == "scph5501.bin", cfg
+assert "assets/tirso/bios.bin" in names
+sheet = cfg["cue_sheet"]
+assert sheet.startswith('FILE "game.bin" BINARY') and "TRACK 02 AUDIO" in sheet, sheet
+track1_frames = (ps1_dir / "PS1 Test (Track 1).bin").stat().st_size // 2352
+mm, rest = divmod(track1_frames + 150, 4500); ss, ff = divmod(rest, 75)
+assert "INDEX 01 %02d:%02d:%02d" % (mm, ss, ff) in sheet, (sheet, track1_frames)
+assert cfg["variables"]["swanstation_GPU_ResolutionScale"] == "4" and cfg["variables"]["swanstation_GPU_WidescreenHack"] == "true"
+assert cfg["variables"]["swanstation_BIOS_PathNTSCU"] == "scph5501.bin" and cfg["controller_type"] == 261
+assert cfg["rom_size"] == sum(f.stat().st_size for f in ps1_dir.glob("PS1 Test (Track *).bin"))
+print("PS1 PASSED: BIN/CUE joined (music track kept), BIOS packed, SwanStation settings")
