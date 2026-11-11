@@ -28,3 +28,5 @@ Installer/
 /ROMS/
 /Claude outputs/
 installer/*.exe
+installer/SHA256SUMS.txt
+release-notes.md

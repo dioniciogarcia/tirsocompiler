@@ -51,8 +51,10 @@ def main():
     print("Building Tirso Compiler", version, flush=True)
     if BUILD.exists():
         shutil.rmtree(BUILD)
-    if INSTALLER.exists():
-        shutil.rmtree(INSTALLER)
+    # NOTE: on Windows "Installer" (output) and "installer" (this script's folder) are the SAME folder,
+    # so never delete the folder; only remove the files from an earlier run.
+    for old in ("TirsoCompilerSetup.exe", "TirsoCompilerUpdate.exe", "SHA256SUMS.txt"):
+        (INSTALLER / old).unlink(missing_ok=True)
 
     sep = os.pathsep  # ";" on Windows
     run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--windowed", "--log-level", "WARN",
