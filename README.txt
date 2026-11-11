@@ -7,7 +7,7 @@ INSTALL IT AS A NORMAL WINDOWS PROGRAM (recommended)
   1. Double-click "Make Installer.bat" (needs the internet the first time;
      about 3-10 minutes). It checks the program, packages it and opens the
      "Installer" folder.
-  2. Double-click "Tirso Compiler Setup 1.0.0.exe" there and follow the steps.
+  2. Double-click "Tirso Compiler Setup <version>.exe" there and follow the steps.
      No administrator rights are needed. You get a Start menu entry and,
      if you tick it, a desktop shortcut. Uninstall from Windows Settings > Apps.
   3. Your library, BIOS copies, GPU drivers, settings and signing key stay in
@@ -186,30 +186,40 @@ CUSTOM GPU DRIVERS (PS2, GAMECUBE, WII)
     OpenGL ES by itself.
   - Tirso never downloads drivers, games or BIOS files.
 
-DOWNLOAD
-  Latest release (always up to date):
-  https://github.com/dioniciogarcia/tirsocompiler/releases/latest/download/TirsoCompiler.zip
-  Unzip and double-click "Start Tirso Compiler.bat". The first run installs what
-  it needs automatically. Your library, BIOS files and settings are kept separately
-  and are never touched by an update.
+DOWNLOAD (no building needed)
+  Installer for a first install or a new PC:
+  https://github.com/dioniciogarcia/tirsocompiler/releases/latest/download/TirsoCompilerSetup.exe
+  All versions: https://github.com/dioniciogarcia/tirsocompiler/releases
+  Run it and follow the steps (no administrator rights needed). Installing a
+  newer Setup over an older install updates it and keeps your data.
 
-UPDATING TIRSO COMPILER
-  Open Settings in the program and click "Check for updates". If a new version
-  is available, click "Update now". The program downloads and verifies it, then
-  closes and reopens on its own. A blue dot on the Settings button means an update
-  is waiting.
+UPDATING TIRSO COMPILER (installed copy)
+  Settings > "Check for updates". If a newer version exists, "Update now"
+  becomes available and the Settings button in the menu shows "Settings . update".
+  The program downloads the update installer from this project's GitHub Releases
+  (only from there), checks its size, its SHA-256 checksum and that it is a real
+  Windows program, then closes, installs it and opens again by itself.
+  - It refuses to update while an app is being built or is waiting in the queue.
+  - If anything fails before the installer starts (no internet, wrong checksum...),
+    nothing is changed and you see a message with a link to download by hand.
+  - Your data (library, BIOS copies, signing key, settings, output folder) is in
+    %LOCALAPPDATA%\TirsoCompiler and is never touched by an update.
+  - The update installer carries the program and the Android templates; the big
+    tools (Java, Apktool, signer) stay as they are. The full Setup has everything.
+  - A copy started with "Start Tirso Compiler.bat" can't update itself; install
+    it with the Setup file instead.
+  - "Check for updates when the program starts" (Settings, on by default) only
+    looks for a new version; it never installs anything on its own.
 
 PUBLISHING A NEW VERSION (for the developer)
-  1. Open app/core/updater.py and raise APP_VERSION (e.g. "1.1.0" → "1.2.0").
-  2. Add a changelog section to this README (a line starting with "## 1.2.0").
-  3. Push to GitHub. The build workflow starts automatically, compiles the zip,
-     and publishes a GitHub Release tagged v1.2.0 with the changelog as notes.
-  Example changelog section (the build reads the text between two ## headings):
-
-## 1.1.0
-- PlayStation 1 support (SwanStation).
-- Cheats menu in every game.
-- PS2 touch fix, hide controls, auto-backup saves.
+  1. Open app/core/updater.py and raise APP_VERSION (for example "1.1.0" to "1.2.0").
+  2. At the very end of this file, under CHANGELOG, add a heading line "## 1.2.0"
+     followed by what changed (the release notes are taken from that section).
+  3. Push to GitHub. The "Build and Release" workflow starts by itself (about 10
+     minutes). It makes the program with PyInstaller and the two installers,
+     then publishes a GitHub Release named v1.2.0 with them and the notes.
+     Pushing the same version again replaces its release.
+  You can also run it by hand: GitHub > Actions > Build and Release > Run workflow.
 
 LATER VERSIONS
   PlayStation 3 is planned for a later version.
@@ -245,3 +255,12 @@ IF IT DOESN'T OPEN
 
 SELF-TEST (optional)
   .venv\Scripts\python.exe -m tests.run_tests
+
+CHANGELOG
+=========
+## 1.1.0
+- PlayStation 1 games (SwanStation engine; import your own PS1 BIOS first).
+- Cheats menu in every game; cheats are downloaded when you build.
+- PlayStation 2: two touch buttons at once, "Hide touch controls" stays hidden until Back,
+  automatic save backups, TirsoDrive restore.
+- Update button: Settings > Check for updates > Update now.

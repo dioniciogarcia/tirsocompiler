@@ -1,253 +1,347 @@
-"""Tests for the self-update module (app/core/updater.py).
+"""Tests for the self-update module (app/core/updater.py) and the release notes script.
 
-Covers:
-  - Version comparison
-  - GitHub API response parsing
-  - SHA-256 extraction from release notes
-  - File validation (zip check)
-  - Download + verify + unzip (using a local HTTP server)
-  - Rollback when the apply-script copies back a backup
+Run: python -m unittest tests.test_updater -v
+
+A small web server on this computer plays the part of GitHub, so the real download,
+size check, checksum check and "is it a Windows program" check are all exercised.
 """
 import hashlib
 import http.server
-import io
 import json
-import os
-import shutil
+import re
 import sys
 import tempfile
 import threading
 import unittest
-import zipfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-# Make sure the project root is on the path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "installer"))
 
-from app.core import updater
+from app.core import updater  # noqa: E402
+import publish_release  # noqa: E402
 
-
-class TestVersionComparison(unittest.TestCase):
-    def test_tuple(self):
-        self.assertEqual(updater._version_tuple("1.10.2"), (1, 10, 2))
-        self.assertEqual(updater._version_tuple("2.0"), (2, 0))
-        self.assertEqual(updater._version_tuple("v3.9"), (3, 9))
-
-    def test_newer(self):
-        self.assertGreater(updater._version_tuple("1.10"), updater._version_tuple("1.9"))
-        self.assertGreater(updater._version_tuple("2.0.0"), updater._version_tuple("1.99.99"))
-
-    def test_same(self):
-        self.assertEqual(updater._version_tuple("1.1.0"), updater._version_tuple("1.1.0"))
+FAKE_EXE = b"MZ" + bytes(range(256)) * (updater.MIN_BYTES // 256 + 8)   # starts with MZ, bigger than the minimum
+FAKE_SHA = hashlib.sha256(FAKE_EXE).hexdigest()
 
 
-class TestApiParsing(unittest.TestCase):
-    """check_for_update() with a fake GitHub API response."""
-
-    FAKE_RESPONSE = {
-        "tag_name": "v1.2.0",
-        "body": "New stuff.\n\nsha256: abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-        "assets": [
-            {"name": "TirsoCompiler.zip",
-             "browser_download_url": "https://example.com/TirsoCompiler.zip",
-             "size": 123456}
-        ],
-    }
-
-    def _fake_urlopen(self, req, timeout=None):
-        resp = MagicMock()
-        resp.__enter__ = lambda s: s
-        resp.__exit__ = MagicMock(return_value=False)
-        resp.read.return_value = json.dumps(self.FAKE_RESPONSE).encode()
-        resp.headers = {}
-        return resp
-
-    def test_update_available(self):
-        with patch("app.core.updater.APP_VERSION", "1.1.0"), \
-             patch("urllib.request.urlopen", self._fake_urlopen):
-            info = updater.check_for_update()
-        self.assertTrue(info["update_available"])
-        self.assertEqual(info["latest_version"], "1.2.0")
-        self.assertEqual(info["current_version"], "1.1.0")
-        self.assertEqual(info["asset_url"], "https://example.com/TirsoCompiler.zip")
-        self.assertEqual(info["asset_size"], 123456)
-        self.assertEqual(info["checksum"],
-                         "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
-        self.assertIsNone(info["error"])
-
-    def test_no_update(self):
-        with patch("app.core.updater.APP_VERSION", "1.2.0"), \
-             patch("urllib.request.urlopen", self._fake_urlopen):
-            info = updater.check_for_update()
-        self.assertFalse(info["update_available"])
-
-    def test_network_error(self):
-        def raise_err(*a, **kw):
-            raise ConnectionError("unreachable")
-        with patch("urllib.request.urlopen", raise_err):
-            info = updater.check_for_update()
-        self.assertIsNone(info["update_available"] or None)
-        self.assertFalse(info["update_available"])
-        self.assertIsNotNone(info["error"])
-
-    def test_checksum_extraction(self):
-        body = "Release notes\n\nSHA256: ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"
-        import re
-        m = re.search(r"sha256[:\s]+([0-9a-f]{64})", body, re.IGNORECASE)
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1).lower(),
-                         "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
-
-
-class TestFileValidation(unittest.TestCase):
-    def test_valid_zip(self):
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as z:
-            z.writestr("app/main.py", "# hello")
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as f:
-            f.write(buf.getvalue())
-            tmp = Path(f.name)
-        try:
-            self.assertTrue(updater._is_valid_zip(tmp))
-        finally:
-            tmp.unlink()
-
-    def test_invalid_zip(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as f:
-            f.write(b"not a zip file")
-            tmp = Path(f.name)
-        try:
-            self.assertFalse(updater._is_valid_zip(tmp))
-        finally:
-            tmp.unlink()
-
-    def test_sha256(self):
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(b"hello world")
-            tmp = Path(f.name)
-        try:
-            expected = hashlib.sha256(b"hello world").hexdigest()
-            self.assertEqual(updater._sha256_file(tmp), expected)
-        finally:
-            tmp.unlink()
-
-
-class _ZipHandler(http.server.BaseHTTPRequestHandler):
-    zip_bytes = b""
+class FakeGitHub(http.server.BaseHTTPRequestHandler):
+    """/api = the "latest release" answer, /dl/<file> = the release files."""
+    api_status = 200
+    api_body = b"{}"
+    files = {}
 
     def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Length", str(len(self.zip_bytes)))
-        self.send_header("Content-Type", "application/zip")
-        self.end_headers()
-        self.wfile.write(self.zip_bytes)
+        if self.path == "/api":
+            self.send_response(self.api_status)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(self.api_body)
+        elif self.path.startswith("/dl/") and self.path[4:] in self.files:
+            data = self.files[self.path[4:]]
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        else:
+            self.send_response(404)
+            self.end_headers()
 
     def log_message(self, *a):
         pass
 
 
-class TestDownloadAndStage(unittest.TestCase):
-    """Uses a local HTTP server so we don't hit the real internet."""
+class ServerCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), FakeGitHub)
+        cls.base = "http://127.0.0.1:%d" % cls.server.server_address[1]
+        threading.Thread(target=cls.server.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
 
     def setUp(self):
-        # Build a fake update zip with one app file
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as z:
-            z.writestr("app/main.py", "# updated main")
-            z.writestr("requirements.txt", "pywebview>=5.1,<6\npillow>=10.4\n")
-        self.zip_bytes = buf.getvalue()
-        self.checksum = hashlib.sha256(self.zip_bytes).hexdigest()
-
-        _ZipHandler.zip_bytes = self.zip_bytes
-        self.server = http.server.HTTPServer(("127.0.0.1", 0), _ZipHandler)
-        self.port = self.server.server_address[1]
-        self.server_thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-        self.server_thread.start()
-
-        # Fake program directory
-        self.prog_dir = Path(tempfile.mkdtemp())
-        (self.prog_dir / "app").mkdir()
-        (self.prog_dir / "app" / "main.py").write_text("# old main")
+        FakeGitHub.api_status = 200
+        FakeGitHub.files = {"TirsoCompilerUpdate.exe": FAKE_EXE}
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.patches = [patch.object(updater, "ALLOWED_PREFIX", self.base + "/dl/"),
+                        patch.object(updater, "downloads_dir", lambda: self.dir)]
+        for p in self.patches:
+            p.start()
 
     def tearDown(self):
-        self.server.shutdown()
-        shutil.rmtree(self.prog_dir, ignore_errors=True)
+        for p in self.patches:
+            p.stop()
+        self.tmp.cleanup()
 
-    def _apply(self, checksum=None):
-        url = "http://127.0.0.1:%d/TirsoCompiler.zip" % self.port
-        messages = []
+    def release(self, tag="v1.2.0", sha=FAKE_SHA, size=len(FAKE_EXE), with_asset=True, body=None):
+        body = body if body is not None else (
+            "- Faster games.\n- New cheats.\n\n%s\nSHA-256 checksums:\n```\n%s  TirsoCompilerSetup.exe\n%s  TirsoCompilerUpdate.exe\n```\n"
+            % (updater.CHECKSUM_MARKER, "a" * 64, sha))
+        assets = [{"name": "TirsoCompilerUpdate.exe", "size": size,
+                   "browser_download_url": self.base + "/dl/TirsoCompilerUpdate.exe"}] if with_asset else []
+        FakeGitHub.api_body = json.dumps({"tag_name": tag, "body": body, "assets": assets}).encode()
 
-        def progress(msg, pct):
-            messages.append(msg)
-
-        # Patch sys.argv[0] so apply_update resolves the program dir correctly
-        fake_argv0 = str(self.prog_dir / "app" / "main.py")
-        with patch("sys.argv", [fake_argv0]), \
-             patch("app.core.updater.subprocess.Popen") as mock_popen:
-            result = updater.apply_update(
-                asset_url=url,
-                checksum=checksum,
-                progress=progress,
-                is_job_running=lambda: False,
-            )
-        return result, messages, mock_popen
-
-    def test_staging_created(self):
-        result, messages, mock_popen = self._apply(checksum=self.checksum)
-        self.assertTrue(result["ok"], result.get("error"))
-        staging = self.prog_dir / ".update_staging"
-        self.assertTrue(staging.exists())
-        self.assertTrue((staging / "app" / "main.py").exists())
-        mock_popen.assert_called_once()
-
-    def test_checksum_mismatch_fails(self):
-        result, messages, _ = self._apply(checksum="0" * 64)
-        self.assertFalse(result["ok"])
-        self.assertIn("Checksum mismatch", result["error"])
-
-    def test_job_running_blocked(self):
-        url = "http://127.0.0.1:%d/TirsoCompiler.zip" % self.port
-        result = updater.apply_update(
-            asset_url=url,
-            checksum=None,
-            progress=lambda m, p: None,
-            is_job_running=lambda: True,
-        )
-        self.assertFalse(result["ok"])
-        self.assertIn("build is running", result["error"])
-
-    def test_staging_cleaned_on_bad_zip(self):
-        url = "http://127.0.0.1:%d/TirsoCompiler.zip" % self.port
-        # Serve garbage bytes
-        _ZipHandler.zip_bytes = b"not a zip"
-        with patch("sys.argv", [str(self.prog_dir / "app" / "main.py")]):
-            result = updater.apply_update(
-                asset_url=url,
-                checksum=None,
-                progress=lambda m, p: None,
-                is_job_running=lambda: False,
-            )
-        self.assertFalse(result["ok"])
-        # Staging should have been cleaned up
-        self.assertFalse((self.prog_dir / ".update_staging").exists())
-        self.assertFalse((self.prog_dir / ".update_download.zip").exists())
+    def check(self):
+        with patch.object(updater, "APP_VERSION", "1.1.0"):
+            return updater.check_for_update(self.base + "/api")
 
 
-class TestCheckUpdateFailed(unittest.TestCase):
-    def test_flag_read_and_cleared(self):
-        with tempfile.TemporaryDirectory() as d:
-            flag = Path(d) / ".update_failed.txt"
-            flag.write_text("disk full", encoding="utf-8")
-            msg = updater.check_update_failed(Path(d))
-            self.assertEqual(msg, "disk full")
-            self.assertFalse(flag.exists())
+class TestVersions(unittest.TestCase):
+    def test_numbers_not_text(self):
+        self.assertTrue(updater.is_newer("3.10", "3.9"))
+        self.assertFalse(updater.is_newer("3.9", "3.10"))
+        self.assertTrue(updater.is_newer("1.10.0", "1.9.9"))
 
-    def test_no_flag(self):
-        with tempfile.TemporaryDirectory() as d:
-            msg = updater.check_update_failed(Path(d))
-            self.assertIsNone(msg)
+    def test_equal_and_older(self):
+        self.assertFalse(updater.is_newer("1.1", "1.1.0"))
+        self.assertFalse(updater.is_newer("1.1.0", "1.1"))
+        self.assertFalse(updater.is_newer("1.0.9", "1.1.0"))
+
+    def test_tag_formats(self):
+        self.assertEqual(updater.version_tuple("v1.2.3"), (1, 2, 3))
+        self.assertEqual(updater.version_tuple("1.2.3-beta"), (1, 2, 3))
+        self.assertFalse(updater.is_newer("nonsense", "1.0"))
+
+
+class TestChecking(ServerCase):
+    def test_newer_release(self):
+        self.release()
+        info = self.check()
+        self.assertIsNone(info["error"])
+        self.assertTrue(info["update_available"])
+        self.assertEqual(info["latest_version"], "1.2.0")
+        self.assertEqual(info["checksum"], FAKE_SHA)
+        self.assertEqual(info["asset_size"], len(FAKE_EXE))
+        self.assertEqual(info["release_notes"], "- Faster games.\n- New cheats.")   # no checksum block shown to the user
+
+    def test_same_version_is_not_an_update(self):
+        self.release(tag="v1.1.0")
+        self.assertFalse(self.check()["update_available"])
+
+    def test_double_digit_version(self):
+        self.release(tag="v1.10.0")
+        self.assertTrue(self.check()["update_available"])
+
+    def test_release_without_update_file(self):
+        self.release(with_asset=False)
+        info = self.check()
+        self.assertFalse(info["update_available"])
+        self.assertIn("update file", info["error"])
+
+    def test_no_release_yet(self):
+        FakeGitHub.api_status = 404
+        self.assertIn("No version", self.check()["error"])
+
+    def test_rate_limited(self):
+        FakeGitHub.api_status = 403
+        self.assertIn("limiting", self.check()["error"])
+
+    def test_nothing_listening(self):
+        with patch.object(updater, "APP_VERSION", "1.1.0"):
+            info = updater.check_for_update("http://127.0.0.1:9/api")
+        self.assertTrue(info["error"])
+        self.assertFalse(info["update_available"])
+
+    def test_garbage_answer(self):
+        FakeGitHub.api_body = b"<html>not json</html>"
+        self.assertTrue(self.check()["error"])
+
+    def test_checksum_parsing(self):
+        body = "x\n%s  A.exe\n%s *B.exe\n" % ("1" * 64, "2" * 64)
+        self.assertEqual(updater.parse_checksums(body), {"A.exe": "1" * 64, "B.exe": "2" * 64})
+
+
+class TestVerify(ServerCase):
+    def write(self, data, name="f.exe"):
+        p = self.dir / name
+        p.write_bytes(data)
+        return p
+
+    def test_good_file(self):
+        updater.verify_file(self.write(FAKE_EXE), len(FAKE_EXE), FAKE_SHA)
+
+    def test_wrong_size(self):
+        with self.assertRaisesRegex(ValueError, "wrong size"):
+            updater.verify_file(self.write(FAKE_EXE), len(FAKE_EXE) + 1, FAKE_SHA)
+
+    def test_too_small(self):
+        small = b"MZ" + b"0" * 1000
+        with self.assertRaisesRegex(ValueError, "unexpected size"):
+            updater.verify_file(self.write(small), len(small), hashlib.sha256(small).hexdigest())
+
+    def test_not_a_windows_program(self):
+        data = b"PK" + FAKE_EXE[2:]
+        with self.assertRaisesRegex(ValueError, "not a Windows program"):
+            updater.verify_file(self.write(data), len(data), hashlib.sha256(data).hexdigest())
+
+    def test_wrong_checksum(self):
+        with self.assertRaisesRegex(ValueError, "checksum"):
+            updater.verify_file(self.write(FAKE_EXE), len(FAKE_EXE), "0" * 64)
+
+    def test_no_checksum_published(self):
+        with self.assertRaisesRegex(ValueError, "checksum"):
+            updater.verify_file(self.write(FAKE_EXE), len(FAKE_EXE), None)
+
+
+class TestDownload(ServerCase):
+    def test_download_reports_progress(self):
+        seen = []
+        updater.download(self.base + "/dl/TirsoCompilerUpdate.exe", self.dir / "u.exe", len(FAKE_EXE), seen.append)
+        self.assertEqual((self.dir / "u.exe").read_bytes(), FAKE_EXE)
+        self.assertTrue(seen and max(seen) <= 99)
+        self.assertFalse((self.dir / "u.exe.part").exists())
+
+    def test_only_our_own_repo(self):
+        with self.assertRaisesRegex(ValueError, "own release files"):
+            updater.download("https://evil.example.com/TirsoCompilerUpdate.exe", self.dir / "u.exe", 10, lambda p: None)
+        self.assertFalse((self.dir / "u.exe").exists())
+
+    def test_bigger_than_announced_is_stopped(self):
+        with self.assertRaisesRegex(ValueError, "bigger"):
+            updater.download(self.base + "/dl/TirsoCompilerUpdate.exe", self.dir / "u.exe", 1000, lambda p: None)
+        self.assertFalse((self.dir / "u.exe").exists())
+        self.assertFalse((self.dir / "u.exe.part").exists())
+
+
+class TestApplyUpdate(ServerCase):
+    def setUp(self):
+        super().setUp()
+        self.release()
+        self.info = self.check()
+        self.started = []
+        self.msgs = []
+        p = patch.object(updater, "can_self_update", lambda: True)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def apply(self, info=None, busy=lambda: None):
+        return updater.apply_update(self.info if info is None else info, lambda m, p: self.msgs.append((m, p)),
+                                    busy, launch=self.started.append)
+
+    def test_full_success(self):
+        r = self.apply()
+        self.assertEqual(r, {"ok": True})
+        cmd = self.started[0]
+        self.assertTrue(cmd[0].endswith("TirsoCompilerUpdate.exe"))
+        for flag in ("/SILENT", "/NORESTART", "/CLOSEAPPLICATIONS", "/relaunch=1"):
+            self.assertIn(flag, cmd)
+        self.assertEqual((self.dir / "TirsoCompilerUpdate.exe").read_bytes(), FAKE_EXE)
+        self.assertEqual(self.msgs[-1][1], 100)
+
+    def test_refused_while_a_build_runs(self):
+        r = self.apply(busy=lambda: "An app is being built.")
+        self.assertFalse(r["ok"])
+        self.assertIn("being built", r["error"])
+        self.assertEqual(self.started, [])
+        self.assertEqual(list(self.dir.iterdir()), [])      # nothing was even downloaded
+
+    def test_build_started_during_download(self):
+        answers = iter([None, "A build started."])
+        r = self.apply(busy=lambda: next(answers))
+        self.assertFalse(r["ok"])
+        self.assertEqual(self.started, [])
+        self.assertEqual(list(self.dir.iterdir()), [])
+
+    def test_wrong_checksum_is_thrown_away(self):
+        r = self.apply(info=dict(self.info, checksum="0" * 64))
+        self.assertFalse(r["ok"])
+        self.assertIn("checksum", r["error"])
+        self.assertEqual(self.started, [])
+        self.assertEqual(list(self.dir.iterdir()), [])
+
+    def test_wrong_size_is_thrown_away(self):
+        r = self.apply(info=dict(self.info, asset_size=len(FAKE_EXE) - 5))
+        self.assertFalse(r["ok"])
+        self.assertEqual(self.started, [])
+        self.assertEqual(list(self.dir.iterdir()), [])
+
+    def test_not_a_windows_program(self):
+        bad = b"ZZ" + FAKE_EXE[2:]
+        FakeGitHub.files["TirsoCompilerUpdate.exe"] = bad
+        r = self.apply(info=dict(self.info, checksum=hashlib.sha256(bad).hexdigest()))
+        self.assertFalse(r["ok"])
+        self.assertIn("not a Windows program", r["error"])
+        self.assertEqual(self.started, [])
+
+    def test_download_from_another_site_refused(self):
+        r = self.apply(info=dict(self.info, asset_url="https://evil.example.com/TirsoCompilerUpdate.exe"))
+        self.assertFalse(r["ok"])
+        self.assertEqual(self.started, [])
+
+    def test_no_internet_during_download(self):
+        FakeGitHub.files = {}
+        r = self.apply()
+        self.assertFalse(r["ok"])
+        self.assertEqual(self.started, [])
+
+    def test_not_enough_disk_space(self):
+        with patch.object(updater.shutil, "disk_usage", lambda p: type("U", (), {"free": 1000})()):
+            r = self.apply()
+        self.assertFalse(r["ok"])
+        self.assertIn("disk space", r["error"])
+        self.assertEqual(self.started, [])
+
+    def test_nothing_to_install(self):
+        r = self.apply(info=dict(self.info, update_available=False))
+        self.assertFalse(r["ok"])
+        self.assertEqual(self.started, [])
+
+    def test_missing_checksum_refused(self):
+        r = self.apply(info=dict(self.info, checksum=None))
+        self.assertFalse(r["ok"])
+        self.assertEqual(self.started, [])
+
+    def test_folder_copy_cannot_update_itself(self):
+        with patch.object(updater, "can_self_update", lambda: False):
+            r = self.apply()
+        self.assertFalse(r["ok"])
+        self.assertIn("runs from a folder", r["error"])
+        self.assertEqual(self.started, [])
+
+    def test_old_installers_are_cleaned_up(self):
+        (self.dir / "old.exe").write_bytes(b"x")
+        updater.cleanup_downloads()
+        self.assertEqual(list(self.dir.iterdir()), [])
+
+
+class TestNeverTouchesData(unittest.TestCase):
+    def test_installer_script_leaves_user_data_alone(self):
+        iss = (ROOT / "installer" / "TirsoCompiler.iss").read_text(encoding="utf-8")
+        # the installer only writes to {app}; the data folder is %LOCALAPPDATA%\TirsoCompiler
+        self.assertNotIn("{localappdata}\\TirsoCompiler", iss.replace("{localappdata}\\Programs\\", ""))
+        self.assertIn("RestartApplications=no", iss)
+        self.assertIn("{param:relaunch|0}", iss)
+
+    def test_update_command_is_silent_and_never_asks_for_a_restart(self):
+        cmd = updater.installer_command(Path("x.exe"), Path("log.txt"))
+        self.assertIn("/NORESTART", cmd)
+
+
+class TestReleaseNotes(unittest.TestCase):
+    README = "INTRO\n\nCHANGELOG\n=========\n## 1.2.0\n- new thing\n- other thing\n\n## 1.1.0\n- old thing\n"
+
+    def test_section_for_version(self):
+        self.assertEqual(publish_release.changelog_section(self.README, "1.2.0"), "- new thing\n- other thing")
+        self.assertEqual(publish_release.changelog_section(self.README, "1.1.0"), "- old thing")
+        self.assertEqual(publish_release.changelog_section(self.README, "1.10.0"), "")
+        self.assertEqual(publish_release.changelog_section(self.README, "1.2"), "")   # 1.2 is not 1.2.0
+
+    def test_readme_has_notes_for_the_current_version(self):
+        readme = (ROOT / "README.txt").read_text(encoding="utf-8")
+        notes = publish_release.changelog_section(readme, updater.APP_VERSION)
+        self.assertTrue(notes, "README.txt needs a '## %s' changelog section" % updater.APP_VERSION)
+        self.assertNotIn("INSTALL", notes)      # the section must stop at the next heading
+
+    def test_version_in_code_is_plain(self):
+        self.assertRegex(updater.APP_VERSION, r"^\d+(\.\d+)+$")
+        text = (ROOT / "app" / "core" / "updater.py").read_text(encoding="utf-8")
+        self.assertTrue(re.search(r'^APP_VERSION\s*=\s*"[^"]+"', text, re.M))
 
 
 if __name__ == "__main__":

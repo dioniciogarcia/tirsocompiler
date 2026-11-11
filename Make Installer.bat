@@ -74,12 +74,13 @@ if not defined ISCC (
   echo  You can start "Tirso Compiler.exe" from there.
   goto fail
 )
-"%ISCC%" /Q "%~dp0installer\TirsoCompiler.iss"
+for /f "delims=" %%V in ('""%PY%" "%~dp0installer\build_release.py" --version"') do set "VER=%%V"
+"%ISCC%" /Q "/DAppVersion=%VER%" "%~dp0installer\TirsoCompiler.iss"
 if errorlevel 1 goto fail
 
 echo.
 echo  Done. The installer is in the "Installer" folder:
-echo    Installer\Tirso Compiler Setup 1.0.0.exe
+echo    Installer\Tirso Compiler Setup %VER%.exe
 echo.
 explorer "%~dp0Installer"
 pause

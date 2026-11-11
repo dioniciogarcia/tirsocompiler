@@ -64,7 +64,7 @@
     await pages[page](main.firstChild, opts || {});
     main.scrollTop = 0;
   }
-  $("#nav").addEventListener("click", (e) => { const p = e.target.dataset.page; if (p) go(p); });
+  $("#nav").addEventListener("click", (e) => { const b = e.target.closest("button[data-page]"); if (b) go(b.dataset.page); });
 
   // events from Python
   let refreshTimer = null;
@@ -89,8 +89,8 @@
       $("#dropVeil").classList.remove("show");
       onDropped(data.paths);
     } else if (event === "update_progress") {
-      const bar = document.querySelector("#updateProgressBar");
-      const msg = document.querySelector("#updateProgressMsg");
+      const bar = document.querySelector("#updBar i");
+      const msg = document.querySelector("#updMsg");
       if (bar) bar.style.width = (data.pct || 0) + "%";
       if (msg) msg.textContent = data.message || "";
     }
@@ -1288,21 +1288,18 @@
   }
 
   // ================================================================ SETTINGS
-  // Mark / unmark the Settings nav button with an update badge
-  function setUpdateBadge(available) {
+  // ---- updates: one check result is kept in S.update and shared by the menu marker and the Settings page
+  function markUpdate() {
     const btn = document.querySelector("#nav button[data-page='settings']");
     if (!btn) return;
-    if (available) {
-      if (!btn.querySelector(".upd-dot")) {
-        const dot = document.createElement("span");
-        dot.className = "upd-dot";
-        dot.title = "Update available";
-        btn.appendChild(dot);
-      }
-    } else {
-      const dot = btn.querySelector(".upd-dot");
-      if (dot) dot.remove();
-    }
+    const has = !!(S.update && S.update.update_available);
+    btn.innerHTML = has ? `Settings <span class="upd-tag">• update</span>` : "Settings";
+    btn.title = has ? "Version " + S.update.latest_version + " is available" : "";
+  }
+  async function checkUpdate() {
+    S.update = await api("check_for_update");
+    markUpdate();
+    return S.update;
   }
 
   pages.settings = async (el) => {
@@ -1319,92 +1316,72 @@
           ${s.key ? `<button class="btn" id="backupKey">Back up key</button>` : ""}</div>
         <div class="list-row"><div class="grow"><h3>Appearance</h3><div class="muted small">Light or dark look for Tirso Compiler. "System" follows Windows.</div></div>
           <div class="seg" id="themeSeg">${[["light", "Light"], ["dark", "Dark"], ["system", "System"]].map(([k, t]) => `<button data-th="${k}" class="${s.theme === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+      </div></div>
 
-        <div class="list-row" style="flex-wrap:wrap;gap:12px">
-          <div class="grow">
-            <h3>Updates</h3>
-            <div class="muted small">Installed version: <b>${esc(s.version)}</b></div>
-            <div id="updateStatus" class="muted small" style="margin-top:4px">—</div>
-            <div id="updateNotes" class="faint small" style="margin-top:6px;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
-            <div style="display:flex;gap:8px">
-              <button class="btn ghost" id="checkUpdate">Check for updates</button>
-              <button class="btn" id="doUpdate" disabled>Update now</button>
-            </div>
-            <div style="width:200px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:none" id="updateProgressWrap">
-              <div id="updateProgressBar" style="height:100%;width:0%;background:var(--accent);transition:width 0.2s"></div>
-            </div>
-            <div id="updateProgressMsg" class="faint small" style="font-size:11px"></div>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-              <input type="checkbox" id="autoUpdateCheck" ${s.auto_update_check ? "checked" : ""}>
-              Check for updates when the program starts
-            </label>
+      <div class="panel" style="max-width:760px;margin-top:16px">
+        <h2 style="margin:0 0 4px">Updates</h2>
+        <div class="list">
+          <div class="list-row"><div class="grow"><h3>Installed version</h3></div><b id="updCur">${esc(s.version)}</b></div>
+          <div class="list-row"><div class="grow"><h3>Newest version on GitHub</h3><div class="muted small" id="updStatus">Not checked yet.</div></div><b id="updNew">-</b></div>
+          <div class="list-row" style="gap:10px">
+            <div class="grow"><div class="faint small" id="updHint"></div></div>
+            <button class="btn" id="updCheck">Check for updates</button>
+            <button class="btn primary" id="updNow" disabled>Update now</button>
           </div>
         </div>
-
-      </div></div>`;
-
-    // wiring
+        <div class="bar" id="updBar" hidden style="margin:12px 0 6px"><i style="width:0"></i></div>
+        <div class="muted small" id="updMsg"></div>
+        <div id="updNotesBox" hidden style="margin-top:14px"><h3 style="margin:0 0 6px">What's new in <span id="updNotesVer"></span></h3>
+          <div class="small muted" id="updNotes" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div></div>
+        <label class="toggle-row" for="updAuto" style="margin-top:16px"><span class="grow"><h3>Check for updates when the program starts</h3>
+          <p>Only looks; it never installs anything by itself.</p></span><input type="checkbox" id="updAuto" class="switch" ${s.auto_update_check ? "checked" : ""}></label>
+      </div>`;
     $("#openOut", el).onclick = () => api("open_folder", "output");
     $("#openData", el).onclick = () => api("open_folder", "data");
     $("#chOut", el).onclick = async () => { await api("pick_output_dir"); go("settings"); };
     const bk = $("#backupKey", el); if (bk) bk.onclick = backupKey;
     $$("#themeSeg button", el).forEach((b) => b.onclick = async () => { await api("set_theme", b.dataset.th); applyTheme(b.dataset.th); go("settings"); });
-    $("#autoUpdateCheck", el).onchange = (e) => api("set_auto_update_check", e.target.checked);
+    $("#updAuto", el).onchange = (e) => api("set_auto_update_check", e.target.checked);
 
-    let _latestInfo = null;
-
-    async function runUpdateCheck() {
-      const statusEl = $("#updateStatus", el);
-      const notesEl = $("#updateNotes", el);
-      const doBtn = $("#doUpdate", el);
-      statusEl.textContent = "Checking…";
-      notesEl.textContent = "";
-      doBtn.disabled = true;
-      const info = await api("check_for_update");
-      _latestInfo = info;
-      if (info.error) {
-        statusEl.innerHTML = `<span style="color:var(--warn)">Could not check: ${esc(info.error)}</span>`;
-      } else if (info.update_available) {
-        statusEl.innerHTML = `<b style="color:var(--accent)">Version ${esc(info.latest_version)} is available!</b>`;
-        notesEl.textContent = info.release_notes || "";
-        doBtn.disabled = false;
-        setUpdateBadge(true);
+    const show = (u) => {
+      const status = $("#updStatus", el), hint = $("#updHint", el), now = $("#updNow", el);
+      $("#updNew", el).textContent = u.latest_version || "-";
+      now.disabled = true; hint.innerHTML = "";
+      $("#updNotesBox", el).hidden = !(u.update_available && u.release_notes);
+      if (u.release_notes) { $("#updNotes", el).textContent = u.release_notes; $("#updNotesVer", el).textContent = u.latest_version; }
+      if (u.error) {
+        status.innerHTML = `<span style="color:var(--warn)">${esc(u.error)}</span>`;
+        hint.innerHTML = `<a href="#" id="updPage">Open the download page</a>`;
+      } else if (u.update_available) {
+        status.innerHTML = `<span style="color:var(--ok)">A newer version is available.</span>`;
+        if (u.can_self_update) now.disabled = false;
+        else hint.innerHTML = `This copy runs from a folder and can't update itself. <a href="#" id="updPage">Download the Setup file</a> and install it once.`;
       } else {
-        statusEl.textContent = "You have the latest version (" + esc(info.current_version) + ").";
-        setUpdateBadge(false);
+        status.textContent = "You have the newest version.";
       }
-    }
-
-    $("#checkUpdate", el).onclick = runUpdateCheck;
-
-    $("#doUpdate", el).onclick = async () => {
-      if (!_latestInfo || !_latestInfo.asset_url) return;
-      const wrap = $("#updateProgressWrap", el);
-      const doBtn = $("#doUpdate", el);
-      const checkBtn = $("#checkUpdate", el);
-      wrap.style.display = "block";
-      doBtn.disabled = true;
-      checkBtn.disabled = true;
-      const res = await api("apply_update", _latestInfo.asset_url, _latestInfo.checksum || null);
-      if (!res.ok) {
-        wrap.style.display = "none";
-        checkBtn.disabled = false;
-        doBtn.disabled = false;
-        const statusEl = $("#updateStatus", el);
-        statusEl.innerHTML = `<span style="color:var(--warn)">Update failed: ${esc(res.error)}<br>
-          <a href="#" id="manualDl" style="color:var(--accent)">Download manually from GitHub Releases</a></span>`;
-        const dl = $("#manualDl", el);
-        if (dl) dl.onclick = (e) => { e.preventDefault(); api("open_url", "https://github.com/dioniciogarcia/tirsocompiler/releases/latest"); };
-      }
-      // On success the window closes itself
+      const pg = $("#updPage", el); if (pg) pg.onclick = (e) => { e.preventDefault(); api("open_url", u.can_self_update === false ? u.setup_url : u.manual_url); };
     };
-
-    // Auto-check if enabled (runs silently; only shows badge if update available)
-    if (s.auto_update_check) {
-      runUpdateCheck();
-    }
+    $("#updCheck", el).onclick = async () => {
+      $("#updStatus", el).textContent = "Checking...";
+      $("#updCheck", el).disabled = true;
+      const u = await checkUpdate();
+      $("#updCheck", el).disabled = false;
+      show(u);
+    };
+    $("#updNow", el).onclick = async () => {
+      const u = S.update;
+      if (!(await confirmBox("Update Tirso Compiler?", `Version ${u.latest_version} will be downloaded and installed. Tirso Compiler closes and opens again by itself. Your games, BIOS files, settings and signing key are not touched.`, "Update now"))) return;
+      $("#updNow", el).disabled = true; $("#updCheck", el).disabled = true;
+      $("#updBar", el).hidden = false; $("#updBar i", el).style.width = "0%"; $("#updMsg", el).textContent = "Starting...";
+      const r = await api("apply_update");
+      if (!r.ok) {
+        $("#updBar", el).hidden = true; $("#updMsg", el).innerHTML = `<span style="color:var(--fail)">${esc(r.error)}</span> <a href="#" id="updManual">Download it by hand</a>`;
+        $("#updCheck", el).disabled = false; $("#updNow", el).disabled = false;
+        $("#updManual", el).onclick = (e) => { e.preventDefault(); api("open_url", u.can_self_update === false ? u.setup_url : u.manual_url); };
+      }
+      // when it worked, the program closes by itself and the installer opens it again
+    };
+    if (S.update) show(S.update);
   };
 
   // Light / dark look. Remembered by Tirso (and by the window, so it opens in the right colours).
@@ -1420,7 +1397,11 @@
 
   // ---------------------------------------------------------------- start
   (async function start() {
-    api("get_settings").then((st) => { if (st && st.theme) applyTheme(st.theme); });
+    api("get_settings").then((st) => {
+      if (st && st.theme) applyTheme(st.theme);
+      if (st && st.version && $("#appVer")) $("#appVer").textContent = "Version " + st.version;
+      if (st && st.auto_update_check) checkUpdate().catch(() => {});
+    });
     const c = await api("get_consoles");
     S.consoles = c.consoles; S.profiles = c.profiles;
     S.consoles.forEach((k) => (S.byId[k.id] = k));

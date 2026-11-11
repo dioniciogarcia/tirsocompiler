@@ -46,6 +46,7 @@ class Api(BatchMixin):
         self._worker.start()
         self._build = None
         self._build_thread = None
+        self._update_info = None
         self._queue = []                 # build ids waiting their turn (oldest first)
         self._qlock = threading.RLock()
         consoles.refresh()
@@ -984,39 +985,37 @@ class Api(BatchMixin):
         return {"ok": True}
 
     def check_for_update(self):
-        """Called from the Settings page (and on startup if auto-check is on)."""
-        return updater_mod.check_for_update()
+        """Asks GitHub for the newest version (Settings page, and when the program starts)."""
+        info = updater_mod.check_for_update()
+        self._update_info = info          # "Update now" uses this, never an address sent by the page
+        return info
 
-    def apply_update(self, asset_url, checksum):
-        """Download, verify and stage the update, then relaunch."""
-        result = {"ok": False, "error": "Update cancelled."}
+    def _update_blocker(self):
+        """A message when something is running that an update would interrupt, otherwise None."""
+        if self.current_build() or self._queue or self._db.one(
+                "SELECT id FROM builds WHERE status IN ('queued','running') LIMIT 1"):
+            return "An app is being built (or waiting to be built). Wait until Build Center is finished, then try again."
+        return None
 
-        def _progress(msg, pct):
+    def apply_update(self):
+        """Downloads, checks and installs the newest version, then closes the program (the installer reopens it)."""
+        def progress(msg, pct):
             self._emit("update_progress", {"message": msg, "pct": pct})
 
-        def _job_running():
-            # A build is running when any build record is in 'building' state
-            try:
-                return bool(self._db.one("SELECT id FROM builds WHERE status='building' LIMIT 1"))
-            except Exception:
-                return False
-
-        result = updater_mod.apply_update(
-            asset_url=asset_url,
-            checksum=checksum,
-            progress=_progress,
-            is_job_running=_job_running,
-        )
+        result = updater_mod.apply_update(getattr(self, "_update_info", None), progress, self._update_blocker)
         if result.get("ok"):
-            # Shut down the window — the apply-script will relaunch
-            import threading
-            def _quit():
-                import time; time.sleep(0.5)
-                win = self._window
-                if win:
-                    win.destroy()
-            threading.Thread(target=_quit, daemon=True).start()
+            threading.Thread(target=self._quit_for_update, daemon=True).start()
         return result
+
+    def _quit_for_update(self):
+        time.sleep(1.0)
+        try:
+            if self._window:
+                self._window.destroy()
+        except Exception:
+            pass
+        time.sleep(8)       # if the window didn't end the program, end it so the installer can replace the files
+        os._exit(0)
 
     def open_folder(self, which):
         target = {"data": paths.data_dir(), "output": Path(self.get_settings()["output_dir"]),
