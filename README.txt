@@ -1,5 +1,5 @@
-TIRSO COMPILER  1.0  -  N64, DS, GBA, PSP, PlayStation 2, GameCube, Wii
-=========================================================================
+TIRSO COMPILER  1.1  -  N64, DS, GBA, PSP, PlayStation 1, PlayStation 2, GameCube, Wii
+======================================================================================
 Turns games you own into standalone Android apps: each app has its own name,
 icon and saves, and opens straight into the game.
 
@@ -186,8 +186,33 @@ CUSTOM GPU DRIVERS (PS2, GAMECUBE, WII)
     OpenGL ES by itself.
   - Tirso never downloads drivers, games or BIOS files.
 
+DOWNLOAD
+  Latest release (always up to date):
+  https://github.com/dioniciogarcia/tirsocompiler/releases/latest/download/TirsoCompiler.zip
+  Unzip and double-click "Start Tirso Compiler.bat". The first run installs what
+  it needs automatically. Your library, BIOS files and settings are kept separately
+  and are never touched by an update.
+
+UPDATING TIRSO COMPILER
+  Open Settings in the program and click "Check for updates". If a new version
+  is available, click "Update now". The program downloads and verifies it, then
+  closes and reopens on its own. A blue dot on the Settings button means an update
+  is waiting.
+
+PUBLISHING A NEW VERSION (for the developer)
+  1. Open app/core/updater.py and raise APP_VERSION (e.g. "1.1.0" → "1.2.0").
+  2. Add a changelog section to this README (a line starting with "## 1.2.0").
+  3. Push to GitHub. The build workflow starts automatically, compiles the zip,
+     and publishes a GitHub Release tagged v1.2.0 with the changelog as notes.
+  Example changelog section (the build reads the text between two ## headings):
+
+## 1.1.0
+- PlayStation 1 support (SwanStation).
+- Cheats menu in every game.
+- PS2 touch fix, hide controls, auto-backup saves.
+
 LATER VERSIONS
-  PlayStation 1 and PlayStation 3 are planned for a later version.
+  PlayStation 3 is planned for a later version.
 
 INSTALLING ON A GALAXY PHONE BY HAND
   1. Copy the APK to the phone (USB cable, or Quick Share from Windows).

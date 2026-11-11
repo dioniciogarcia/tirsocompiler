@@ -97,6 +97,7 @@ button, input, select { font: inherit; color: inherit; }
 .nav button:hover { color: var(--text); background: var(--hover); }
 .nav button.active { color: var(--text); background: var(--panel-2); }
 .nav button.active::before { content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--label); }
+.upd-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #3b82f6); margin-left: 6px; vertical-align: middle; }
 .side-foot { margin-top: auto; padding: 14px 10px 4px; border-top: 1px solid var(--line); }
 .phase-track { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 8px; }
 .phase-track span { height: 4px; border-radius: 2px; background: var(--line-2); }

@@ -43,6 +43,12 @@ def main():
     api.attach_window(window)
 
     def on_loaded():
+        # Show a toast if the previous update failed
+        from app.core import updater as updater_mod
+        failed_msg = updater_mod.check_update_failed(paths.app_root().parent)
+        if failed_msg:
+            emit("update_progress", {"message": "⚠ Last update failed: " + failed_msg, "pct": 0})
+
         # Drag and drop: hand the full file paths to the interface, which
         # decides whether they are games (ROM Library) or BIOS files.
         try:

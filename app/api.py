@@ -19,6 +19,7 @@ from pathlib import Path
 
 from .core import bios as bios_mod
 from .core import adapters as adapters_mod, apkbuild, consoles, identify, package_id, paths, toolchain
+from .core import updater as updater_mod
 from .core.db import Database
 from .core.hashing import file_hashes
 from .batch import BatchMixin
@@ -951,7 +952,8 @@ class Api(BatchMixin):
         return {
             "output_dir": self._db.get_setting("output_dir", str(paths.default_output_dir())),
             "data_dir": str(paths.data_dir()),
-            "version": "1.1.0",
+            "version": updater_mod.APP_VERSION,
+            "auto_update_check": self._db.get_setting("auto_update_check", "1") == "1",
             "theme": self._db.get_setting("theme", "dark"),
             "key": toolchain.keystore_info() is not None,
             "key_path": str(toolchain.keystore_path()),
@@ -975,6 +977,46 @@ class Api(BatchMixin):
         import webbrowser
         webbrowser.open(url)
         return {"ok": True}
+
+    # ------------------------------------------------------------ updates
+    def set_auto_update_check(self, enabled):
+        self._db.set_setting("auto_update_check", "1" if enabled else "0")
+        return {"ok": True}
+
+    def check_for_update(self):
+        """Called from the Settings page (and on startup if auto-check is on)."""
+        return updater_mod.check_for_update()
+
+    def apply_update(self, asset_url, checksum):
+        """Download, verify and stage the update, then relaunch."""
+        result = {"ok": False, "error": "Update cancelled."}
+
+        def _progress(msg, pct):
+            self._emit("update_progress", {"message": msg, "pct": pct})
+
+        def _job_running():
+            # A build is running when any build record is in 'building' state
+            try:
+                return bool(self._db.one("SELECT id FROM builds WHERE status='building' LIMIT 1"))
+            except Exception:
+                return False
+
+        result = updater_mod.apply_update(
+            asset_url=asset_url,
+            checksum=checksum,
+            progress=_progress,
+            is_job_running=_job_running,
+        )
+        if result.get("ok"):
+            # Shut down the window — the apply-script will relaunch
+            import threading
+            def _quit():
+                import time; time.sleep(0.5)
+                win = self._window
+                if win:
+                    win.destroy()
+            threading.Thread(target=_quit, daemon=True).start()
+        return result
 
     def open_folder(self, which):
         target = {"data": paths.data_dir(), "output": Path(self.get_settings()["output_dir"]),

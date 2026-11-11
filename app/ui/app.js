@@ -88,6 +88,11 @@
     } else if (event === "files_dropped") {
       $("#dropVeil").classList.remove("show");
       onDropped(data.paths);
+    } else if (event === "update_progress") {
+      const bar = document.querySelector("#updateProgressBar");
+      const msg = document.querySelector("#updateProgressMsg");
+      if (bar) bar.style.width = (data.pct || 0) + "%";
+      if (msg) msg.textContent = data.message || "";
     }
   };
 
@@ -1283,6 +1288,23 @@
   }
 
   // ================================================================ SETTINGS
+  // Mark / unmark the Settings nav button with an update badge
+  function setUpdateBadge(available) {
+    const btn = document.querySelector("#nav button[data-page='settings']");
+    if (!btn) return;
+    if (available) {
+      if (!btn.querySelector(".upd-dot")) {
+        const dot = document.createElement("span");
+        dot.className = "upd-dot";
+        dot.title = "Update available";
+        btn.appendChild(dot);
+      }
+    } else {
+      const dot = btn.querySelector(".upd-dot");
+      if (dot) dot.remove();
+    }
+  }
+
   pages.settings = async (el) => {
     const s = await api("get_settings");
     el.innerHTML = `
@@ -1297,13 +1319,92 @@
           ${s.key ? `<button class="btn" id="backupKey">Back up key</button>` : ""}</div>
         <div class="list-row"><div class="grow"><h3>Appearance</h3><div class="muted small">Light or dark look for Tirso Compiler. "System" follows Windows.</div></div>
           <div class="seg" id="themeSeg">${[["light", "Light"], ["dark", "Dark"], ["system", "System"]].map(([k, t]) => `<button data-th="${k}" class="${s.theme === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
-        <div class="list-row"><div class="grow"><h3>Version</h3><div class="muted small">${esc(s.version)}</div></div></div>
+
+        <div class="list-row" style="flex-wrap:wrap;gap:12px">
+          <div class="grow">
+            <h3>Updates</h3>
+            <div class="muted small">Installed version: <b>${esc(s.version)}</b></div>
+            <div id="updateStatus" class="muted small" style="margin-top:4px">—</div>
+            <div id="updateNotes" class="faint small" style="margin-top:6px;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+            <div style="display:flex;gap:8px">
+              <button class="btn ghost" id="checkUpdate">Check for updates</button>
+              <button class="btn" id="doUpdate" disabled>Update now</button>
+            </div>
+            <div style="width:200px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:none" id="updateProgressWrap">
+              <div id="updateProgressBar" style="height:100%;width:0%;background:var(--accent);transition:width 0.2s"></div>
+            </div>
+            <div id="updateProgressMsg" class="faint small" style="font-size:11px"></div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="autoUpdateCheck" ${s.auto_update_check ? "checked" : ""}>
+              Check for updates when the program starts
+            </label>
+          </div>
+        </div>
+
       </div></div>`;
+
+    // wiring
     $("#openOut", el).onclick = () => api("open_folder", "output");
     $("#openData", el).onclick = () => api("open_folder", "data");
     $("#chOut", el).onclick = async () => { await api("pick_output_dir"); go("settings"); };
     const bk = $("#backupKey", el); if (bk) bk.onclick = backupKey;
     $$("#themeSeg button", el).forEach((b) => b.onclick = async () => { await api("set_theme", b.dataset.th); applyTheme(b.dataset.th); go("settings"); });
+    $("#autoUpdateCheck", el).onchange = (e) => api("set_auto_update_check", e.target.checked);
+
+    let _latestInfo = null;
+
+    async function runUpdateCheck() {
+      const statusEl = $("#updateStatus", el);
+      const notesEl = $("#updateNotes", el);
+      const doBtn = $("#doUpdate", el);
+      statusEl.textContent = "Checking…";
+      notesEl.textContent = "";
+      doBtn.disabled = true;
+      const info = await api("check_for_update");
+      _latestInfo = info;
+      if (info.error) {
+        statusEl.innerHTML = `<span style="color:var(--warn)">Could not check: ${esc(info.error)}</span>`;
+      } else if (info.update_available) {
+        statusEl.innerHTML = `<b style="color:var(--accent)">Version ${esc(info.latest_version)} is available!</b>`;
+        notesEl.textContent = info.release_notes || "";
+        doBtn.disabled = false;
+        setUpdateBadge(true);
+      } else {
+        statusEl.textContent = "You have the latest version (" + esc(info.current_version) + ").";
+        setUpdateBadge(false);
+      }
+    }
+
+    $("#checkUpdate", el).onclick = runUpdateCheck;
+
+    $("#doUpdate", el).onclick = async () => {
+      if (!_latestInfo || !_latestInfo.asset_url) return;
+      const wrap = $("#updateProgressWrap", el);
+      const doBtn = $("#doUpdate", el);
+      const checkBtn = $("#checkUpdate", el);
+      wrap.style.display = "block";
+      doBtn.disabled = true;
+      checkBtn.disabled = true;
+      const res = await api("apply_update", _latestInfo.asset_url, _latestInfo.checksum || null);
+      if (!res.ok) {
+        wrap.style.display = "none";
+        checkBtn.disabled = false;
+        doBtn.disabled = false;
+        const statusEl = $("#updateStatus", el);
+        statusEl.innerHTML = `<span style="color:var(--warn)">Update failed: ${esc(res.error)}<br>
+          <a href="#" id="manualDl" style="color:var(--accent)">Download manually from GitHub Releases</a></span>`;
+        const dl = $("#manualDl", el);
+        if (dl) dl.onclick = (e) => { e.preventDefault(); api("open_url", "https://github.com/dioniciogarcia/tirsocompiler/releases/latest"); };
+      }
+      // On success the window closes itself
+    };
+
+    // Auto-check if enabled (runs silently; only shows badge if update available)
+    if (s.auto_update_check) {
+      runUpdateCheck();
+    }
   };
 
   // Light / dark look. Remembered by Tirso (and by the window, so it opens in the right colours).

@@ -1,0 +1,122 @@
+name: Build and Release
+
+# Runs when code changes on main (excluding templates and tools which are
+# large binary blobs that change separately), and can be triggered manually.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'requirements.txt'
+      - '*.bat'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write   # needed to create/update Releases
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Read APP_VERSION
+        id: version
+        shell: python
+        run: |
+          import re, os
+          text = open("app/core/updater.py", encoding="utf-8").read()
+          m = re.search(r'^APP_VERSION\s*=\s*["\']([^"\']+)["\']', text, re.M)
+          v = m.group(1) if m else "0.0.0"
+          print("Version:", v)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"version={v}\n")
+              f.write(f"tag=v{v}\n")
+
+      - name: Extract release notes from README
+        id: notes
+        shell: python
+        run: |
+          import os, re
+          tag = "${{ steps.version.outputs.tag }}"
+          version = "${{ steps.version.outputs.version }}"
+          readme = ""
+          for name in ("README.md", "README.txt"):
+              try:
+                  readme = open(name, encoding="utf-8").read()
+                  break
+              except FileNotFoundError:
+                  pass
+
+          # Look for a section starting with the version number (e.g. ## 1.1.0 or ## v1.1.0)
+          pattern = rf"(?:^|\n)##\s+v?{re.escape(version)}[^\n]*\n(.*?)(?=\n##\s|\Z)"
+          m = re.search(pattern, readme, re.DOTALL)
+          notes = m.group(1).strip() if m else f"Tirso Compiler {version}"
+          notes_file = os.environ.get("RUNNER_TEMP", ".") + "\\release_notes.txt"
+          open(notes_file, "w", encoding="utf-8").write(notes)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"notes_file={notes_file}\n")
+
+      - name: Build TirsoCompiler.zip
+        shell: python
+        run: |
+          import hashlib, io, os, zipfile
+          from pathlib import Path
+
+          root = Path(".")
+          out = Path("TirsoCompiler.zip")
+
+          # Include only these top-level items (everything else is data/binaries)
+          INCLUDE = {"app", "requirements.txt", "Start Tirso Compiler.bat", "Make Installer.bat"}
+          # Always skip these even if they appear inside included folders
+          SKIP_NAMES = {".venv", "__pycache__", ".pytest_cache", ".git",
+                        ".update_staging", ".update_backup", ".apply_update.py",
+                        ".update_download.zip", ".update_failed.txt"}
+
+          with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+              for top in INCLUDE:
+                  p = root / top
+                  if not p.exists():
+                      continue
+                  if p.is_file():
+                      z.write(p, top)
+                  else:
+                      for f in p.rglob("*"):
+                          # Skip hidden/cache folders anywhere in the tree
+                          if any(part in SKIP_NAMES for part in f.parts):
+                              continue
+                          if f.is_file():
+                              z.write(f, str(f.relative_to(root)))
+
+          # Compute SHA-256
+          sha = hashlib.sha256(out.read_bytes()).hexdigest()
+          print(f"Built {out} ({out.stat().st_size:,} bytes)")
+          print(f"SHA-256: {sha}")
+          Path("sha256.txt").write_text(sha, encoding="utf-8")
+          with open(os.environ["GITHUB_ENV"], "a") as fh:
+              fh.write(f"ASSET_SHA256={sha}\n")
+
+      - name: Append checksum to release notes
+        shell: python
+        run: |
+          import os
+          notes_file = r"${{ steps.notes.outputs.notes_file }}"
+          sha = os.environ.get("ASSET_SHA256", "")
+          with open(notes_file, "a", encoding="utf-8") as f:
+              f.write(f"\n\n---\nsha256: {sha}")
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Tirso Compiler ${{ steps.version.outputs.version }}
+          body_path: ${{ steps.notes.outputs.notes_file }}
+          files: |
+            TirsoCompiler.zip
+          # Overwrite any existing release with this tag instead of failing
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
